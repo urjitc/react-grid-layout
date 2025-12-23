@@ -66,6 +66,8 @@ export interface UseGridLayoutOptions {
   allowOverlap?: boolean;
   /** Prevent collisions when moving items */
   preventCollision?: boolean;
+  /** Minimum overlap in grid units required for collision (default: 0) */
+  collisionThreshold?: number;
   /** Called when layout changes */
   onLayoutChange?: (layout: Layout) => void;
 }
@@ -164,6 +166,7 @@ export function useGridLayout(
     compactType = "vertical",
     allowOverlap = false,
     preventCollision = false,
+    collisionThreshold = 0,
     onLayoutChange
   } = options;
 
@@ -283,7 +286,8 @@ export function useGridLayout(
         preventCollision,
         compactType,
         cols,
-        allowOverlap
+        allowOverlap,
+        collisionThreshold
       );
 
       // Compact layout
@@ -293,7 +297,14 @@ export function useGridLayout(
 
       setLayoutState(compacted);
     },
-    [layout, cols, compactType, preventCollision, allowOverlap]
+    [
+      layout,
+      cols,
+      compactType,
+      preventCollision,
+      allowOverlap,
+      collisionThreshold
+    ]
   );
 
   const onDragStop = useCallback(
@@ -311,7 +322,8 @@ export function useGridLayout(
         preventCollision,
         compactType,
         cols,
-        allowOverlap
+        allowOverlap,
+        collisionThreshold
       );
 
       // Compact and finalize
