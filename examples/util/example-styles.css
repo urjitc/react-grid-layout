@@ -283,6 +283,30 @@ body {
   border-bottom: 1px solid rgba(0, 240, 255, 0.3);
 }
 
+.header-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-links a:not(.version-badge) {
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--cyber-cyan);
+  background: rgba(0, 240, 255, 0.08);
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  text-decoration: none;
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+  transition: all 0.2s ease;
+}
+
+.header-links a:not(.version-badge):hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: rgba(0, 240, 255, 0.7);
+  box-shadow: var(--glow-cyan);
+}
+
 h3 {
   font-family: 'Orbitron', sans-serif;
   font-size: 20px;
@@ -804,4 +828,22 @@ button:focus {
   60% { transform: translate(2px, 2px); }
   80% { transform: translate(2px, -2px); }
   100% { transform: translate(0); }
+}
+
+/* === PREVENT TEXT SELECTION DURING DRAG/RESIZE === */
+/* Apply user-select: none globally when any grid item is being dragged or resized */
+body:has(.react-draggable-dragging),
+body:has(.resizing) {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Also apply to grid items themselves to prevent selection on mousedown before drag starts */
+.react-grid-item {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }

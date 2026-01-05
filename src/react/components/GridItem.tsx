@@ -26,7 +26,8 @@ import type {
   LayoutConstraint,
   ConstraintContext,
   Layout,
-  LayoutItem as LayoutItemType
+  LayoutItem as LayoutItemType,
+  PositionStrategy
 } from "../../core/types.js";
 import type { PositionParams } from "../../core/calculate.js";
 import {
@@ -115,6 +116,10 @@ export interface GridItemProps {
   usePercentages?: boolean;
   /** Scale factor for transforms */
   transformScale?: number;
+  /** Position strategy for custom positioning (#2217) */
+  positionStrategy?: PositionStrategy;
+  /** Drag threshold in pixels before drag starts (#2217) */
+  dragThreshold?: number;
   /** Current position of a dropping element */
   droppingPosition?: DroppingPosition;
 
@@ -202,6 +207,8 @@ export function GridItem(props: GridItemProps): ReactElement {
     useCSSTransforms = true,
     usePercentages = false,
     transformScale = 1,
+    positionStrategy,
+    dragThreshold = 0,
     droppingPosition,
     className = "",
     style,
@@ -248,6 +255,27 @@ export function GridItem(props: GridItemProps): ReactElement {
     undefined
   );
 
+  // Ref to current layout - Critical for preventing infinite update loops (#2210).
+  // The dropping item effect depends on onDrag, which needs layout for constraints.
+  // If we included layout directly, onDrag would be recreated on every layout change,
+  // causing the effect to re-run and update layout again, creating an infinite loop.
+  const layoutRef = useRef<Layout>(layout);
+  layoutRef.current = layout;
+
+  // Refs to callbacks for use in dropping item effect (#2210).
+  // The dropping item effect must NOT depend on onDragStart/onDrag callbacks because:
+  // 1. When dragging state changes, onDrag callback is recreated
+  // 2. When layout changes, effectiveLayoutItem changes, causing callbacks to recreate
+  // Using refs allows us to call the latest callback without the effect re-running.
+  const onDragStartRef = useRef<DraggableEventHandler | null>(null);
+  const onDragRef = useRef<DraggableEventHandler | null>(null);
+
+  // Drag threshold tracking (#2217)
+  // Tracks whether we're waiting to exceed the threshold before starting the drag
+  const dragPendingRef = useRef(false);
+  const initialDragClientRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const thresholdExceededRef = useRef(false);
+
   // Position parameters
   const positionParams: PositionParams = useMemo(
     () => ({
@@ -262,6 +290,8 @@ export function GridItem(props: GridItemProps): ReactElement {
   );
 
   // Constraint context for applying constraints
+  // Note: This does NOT include layout in its dependencies to prevent infinite loops (#2210).
+  // The layout is accessed via layoutRef.current inside the callbacks that use this context.
   const constraintContext: ConstraintContext = useMemo(
     () => ({
       cols,
@@ -270,9 +300,21 @@ export function GridItem(props: GridItemProps): ReactElement {
       containerHeight: 0, // Auto-height grids don't have a fixed container height
       rowHeight,
       margin,
-      layout
+      // Use empty layout here - the actual layout will be accessed via layoutRef when needed
+      // This prevents the context from changing when layout changes, avoiding callback recreation
+      layout: []
     }),
-    [cols, maxRows, containerWidth, rowHeight, margin, layout]
+    [cols, maxRows, containerWidth, rowHeight, margin]
+  );
+
+  // Create a getter for constraint context with current layout
+  // This is called inside callbacks to get fresh layout data without causing re-renders
+  const getConstraintContext = useCallback(
+    (): ConstraintContext => ({
+      ...constraintContext,
+      layout: layoutRef.current
+    }),
+    [constraintContext]
   );
 
   // Effective layout item (use provided or create from props)
@@ -298,6 +340,12 @@ export function GridItem(props: GridItemProps): ReactElement {
 
   const createStyle = useCallback(
     (pos: Position): CSSProperties => {
+      // Use custom positionStrategy.calcStyle() if provided (#2217)
+      if (positionStrategy?.calcStyle) {
+        return positionStrategy.calcStyle(pos);
+      }
+
+      // Default positioning based on useCSSTransforms
       if (useCSSTransforms) {
         return setTransform(pos) as CSSProperties;
       }
@@ -314,7 +362,7 @@ export function GridItem(props: GridItemProps): ReactElement {
 
       return styleObj;
     },
-    [useCSSTransforms, usePercentages, containerWidth]
+    [positionStrategy, useCSSTransforms, usePercentages, containerWidth]
   );
 
   // ============================================================================
@@ -336,12 +384,39 @@ export function GridItem(props: GridItemProps): ReactElement {
       const cTop = clientRect.top / transformScale;
       const pTop = parentRect.top / transformScale;
 
-      const newPosition: PartialPosition = {
-        left: cLeft - pLeft + offsetParent.scrollLeft,
-        top: cTop - pTop + offsetParent.scrollTop
-      };
+      // Use custom positionStrategy.calcDragPosition() if provided (#2217)
+      let newPosition: PartialPosition;
+      if (positionStrategy?.calcDragPosition) {
+        const mouseEvent = e as unknown as MouseEvent;
+        newPosition = positionStrategy.calcDragPosition(
+          mouseEvent.clientX,
+          mouseEvent.clientY,
+          mouseEvent.clientX - clientRect.left,
+          mouseEvent.clientY - clientRect.top
+        );
+      } else {
+        newPosition = {
+          left: cLeft - pLeft + offsetParent.scrollLeft,
+          top: cTop - pTop + offsetParent.scrollTop
+        };
+      }
 
       dragPositionRef.current = newPosition;
+
+      // Threshold support (#2217) - if threshold is set, delay calling onDragStartProp
+      // until the mouse has moved at least `dragThreshold` pixels
+      if (dragThreshold > 0) {
+        const mouseEvent = e as unknown as MouseEvent;
+        initialDragClientRef.current = {
+          x: mouseEvent.clientX,
+          y: mouseEvent.clientY
+        };
+        dragPendingRef.current = true;
+        thresholdExceededRef.current = false;
+        setDragging(true);
+        return; // Don't call onDragStartProp yet
+      }
+
       setDragging(true);
 
       // Calculate raw position and apply constraints
@@ -355,7 +430,7 @@ export function GridItem(props: GridItemProps): ReactElement {
         effectiveLayoutItem,
         rawPos.x,
         rawPos.y,
-        constraintContext
+        getConstraintContext()
       );
 
       onDragStartProp(i, newX, newY, {
@@ -368,9 +443,11 @@ export function GridItem(props: GridItemProps): ReactElement {
       onDragStartProp,
       transformScale,
       positionParams,
+      positionStrategy,
+      dragThreshold,
       constraints,
       effectiveLayoutItem,
-      constraintContext,
+      getConstraintContext,
       i
     ]
   );
@@ -378,6 +455,45 @@ export function GridItem(props: GridItemProps): ReactElement {
   const onDrag: DraggableEventHandler = useCallback(
     (e, { node, deltaX, deltaY }) => {
       if (!onDragProp || !dragging) return;
+
+      const mouseEvent = e as unknown as MouseEvent;
+
+      // Threshold support (#2217) - check if we've exceeded the threshold
+      if (dragPendingRef.current && !thresholdExceededRef.current) {
+        const dx = mouseEvent.clientX - initialDragClientRef.current.x;
+        const dy = mouseEvent.clientY - initialDragClientRef.current.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance < dragThreshold) {
+          // Haven't exceeded threshold yet, don't trigger drag
+          return;
+        }
+
+        // Threshold exceeded! Call onDragStartProp first, then continue with onDrag
+        thresholdExceededRef.current = true;
+        dragPendingRef.current = false;
+
+        // Call onDragStartProp now that threshold is exceeded
+        if (onDragStartProp) {
+          const rawPos = calcXYRaw(
+            positionParams,
+            dragPositionRef.current.top,
+            dragPositionRef.current.left
+          );
+          const { x: startX, y: startY } = applyPositionConstraints(
+            constraints,
+            effectiveLayoutItem,
+            rawPos.x,
+            rawPos.y,
+            getConstraintContext()
+          );
+          onDragStartProp(i, startX, startY, {
+            e: e as unknown as Event,
+            node,
+            newPosition: dragPositionRef.current
+          });
+        }
+      }
 
       let top = dragPositionRef.current.top + deltaY;
       let left = dragPositionRef.current.left + deltaX;
@@ -408,7 +524,7 @@ export function GridItem(props: GridItemProps): ReactElement {
         effectiveLayoutItem,
         rawPos.x,
         rawPos.y,
-        constraintContext
+        getConstraintContext()
       );
 
       onDragProp(i, newX, newY, {
@@ -419,7 +535,9 @@ export function GridItem(props: GridItemProps): ReactElement {
     },
     [
       onDragProp,
+      onDragStartProp,
       dragging,
+      dragThreshold,
       isBounded,
       h,
       rowHeight,
@@ -430,13 +548,27 @@ export function GridItem(props: GridItemProps): ReactElement {
       i,
       constraints,
       effectiveLayoutItem,
-      constraintContext
+      getConstraintContext
     ]
   );
 
   const onDragStop: DraggableEventHandler = useCallback(
     (e, { node }) => {
       if (!onDragStopProp || !dragging) return;
+
+      // Reset threshold tracking (#2217)
+      const wasPending = dragPendingRef.current;
+      dragPendingRef.current = false;
+      thresholdExceededRef.current = false;
+      initialDragClientRef.current = { x: 0, y: 0 };
+
+      // If threshold was never exceeded, don't call onDragStopProp
+      // since onDragStartProp was never called
+      if (wasPending) {
+        setDragging(false);
+        dragPositionRef.current = { left: 0, top: 0 };
+        return;
+      }
 
       const { left, top } = dragPositionRef.current;
       const newPosition: PartialPosition = { top, left };
@@ -451,7 +583,7 @@ export function GridItem(props: GridItemProps): ReactElement {
         effectiveLayoutItem,
         rawPos.x,
         rawPos.y,
-        constraintContext
+        getConstraintContext()
       );
 
       onDragStopProp(i, newX, newY, {
@@ -466,10 +598,14 @@ export function GridItem(props: GridItemProps): ReactElement {
       positionParams,
       constraints,
       effectiveLayoutItem,
-      constraintContext,
+      getConstraintContext,
       i
     ]
   );
+
+  // Update callback refs for use in dropping item effect (#2210)
+  onDragStartRef.current = onDragStart;
+  onDragRef.current = onDrag;
 
   // ============================================================================
   // Resize Handlers
@@ -522,7 +658,7 @@ export function GridItem(props: GridItemProps): ReactElement {
         rawSize.w,
         rawSize.h,
         resizeHandle,
-        constraintContext
+        getConstraintContext()
       );
 
       handler(i, newW, newH, {
@@ -538,12 +674,10 @@ export function GridItem(props: GridItemProps): ReactElement {
       onResizeStopProp,
       containerWidth,
       positionParams,
-      x,
-      y,
       i,
       constraints,
       effectiveLayoutItem,
-      constraintContext
+      getConstraintContext
     ]
   );
 
@@ -590,6 +724,9 @@ export function GridItem(props: GridItemProps): ReactElement {
   // Dropping Item Support
   // ============================================================================
 
+  // Dropping Item Support - uses refs to avoid callback dependency changes (#2210)
+  // The effect only depends on droppingPosition and dragging state.
+  // Callbacks are accessed via refs to get the latest version without triggering re-runs.
   useEffect(() => {
     if (!droppingPosition) return;
 
@@ -617,7 +754,11 @@ export function GridItem(props: GridItemProps): ReactElement {
         x: droppingPosition.left,
         y: droppingPosition.top
       };
-      onDragStart(droppingPosition.e as unknown as MouseEvent, fakeData);
+      // Use ref to get latest callback without dependency
+      onDragStartRef.current?.(
+        droppingPosition.e as unknown as MouseEvent,
+        fakeData
+      );
     } else if (shouldDrag) {
       // Continue drag
       const deltaX = droppingPosition.left - dragPositionRef.current.left;
@@ -632,11 +773,15 @@ export function GridItem(props: GridItemProps): ReactElement {
         x: droppingPosition.left,
         y: droppingPosition.top
       };
-      onDrag(droppingPosition.e as unknown as MouseEvent, fakeData);
+      // Use ref to get latest callback without dependency
+      onDragRef.current?.(
+        droppingPosition.e as unknown as MouseEvent,
+        fakeData
+      );
     }
 
     prevDroppingPositionRef.current = droppingPosition;
-  }, [droppingPosition, dragging, onDragStart, onDrag]);
+  }, [droppingPosition, dragging, i]);
 
   // ============================================================================
   // Render

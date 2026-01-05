@@ -49,7 +49,7 @@ import {
   correctBounds
 } from "../../core/layout.js";
 import { getAllCollisions } from "../../core/collision.js";
-import { compact } from "../../core/compact-compat.js";
+// Note: compact from compact-compat.js is NOT used - we use compactor.compact() instead (#2213)
 import { getCompactor } from "../../core/compactors.js";
 import {
   calcXY,
@@ -239,8 +239,7 @@ function synchronizeLayoutWithChildren(
   initialLayout: Layout,
   children: React.ReactNode,
   cols: number,
-  compactType: CompactType,
-  allowOverlap: boolean
+  compactor: Compactor
 ): Layout {
   const layout: LayoutItem[] = [];
   const childKeys = new Set<string>();
@@ -290,9 +289,9 @@ function synchronizeLayoutWithChildren(
     }
   });
 
-  // Correct bounds and compact
+  // Correct bounds and compact using the compactor's compact method (#2213)
   const corrected = correctBounds(layout, { cols });
-  return compact(corrected, compactType, cols, allowOverlap);
+  return compactor.compact(corrected, cols);
 }
 
 // ============================================================================
@@ -363,14 +362,19 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
     enabled: isDraggable,
     bounded: isBounded,
     handle: draggableHandle,
-    cancel: draggableCancel
+    cancel: draggableCancel,
+    threshold: dragThreshold
   } = dragConfig;
   const {
     enabled: isResizable,
     handles: resizeHandles,
     handleComponent: resizeHandle
   } = resizeConfig;
-  const { enabled: isDroppable, defaultItem: defaultDropItem } = dropConfig;
+  const {
+    enabled: isDroppable,
+    defaultItem: defaultDropItem,
+    onDragOver: dropConfigOnDragOver
+  } = dropConfig;
 
   // Get compactor (use provided or get from type)
   const compactor = compactorProp ?? getCompactor("vertical");
@@ -397,13 +401,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
   // State
   const [mounted, setMounted] = useState(false);
   const [layout, setLayout] = useState<Layout>(() =>
-    synchronizeLayoutWithChildren(
-      propsLayout,
-      children,
-      cols,
-      compactType,
-      allowOverlap
-    )
+    synchronizeLayoutWithChildren(propsLayout, children, cols, compactor)
   );
   const [activeDrag, setActiveDrag] = useState<LayoutItem | null>(null);
   const [resizing, setResizing] = useState(false);
@@ -457,10 +455,14 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         baseLayout,
         children,
         cols,
-        compactType,
-        allowOverlap
+        compactor
       );
-      setLayout(newLayout);
+      // Only update if the layout actually changed (#2210)
+      // This prevents infinite loops when controlled state updates trigger
+      // sync effects that produce the same layout
+      if (!deepEqual(newLayout, layout)) {
+        setLayout(newLayout);
+      }
     }
 
     prevPropsLayoutRef.current = propsLayout;
@@ -471,7 +473,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
     children,
     cols,
     compactType,
-    allowOverlap,
+    compactor,
     activeDrag,
     droppingDOMNode,
     layout
@@ -481,9 +483,14 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
   useEffect(() => {
     if (!activeDrag && !deepEqual(layout, prevLayoutRef.current)) {
       prevLayoutRef.current = layout;
-      onLayoutChange(layout);
+      // Filter out dropping placeholder - it's transient internal state only (#2210)
+      // The dropping item should not be exposed to users until the actual drop happens.
+      // This prevents infinite loops in controlled state patterns where children derive
+      // from layout (e.g., children = layouts.map(...) with onLayoutChange={setLayouts}).
+      const publicLayout = layout.filter(l => l.i !== droppingItem.i);
+      onLayoutChange(publicLayout);
     }
-  }, [layout, activeDrag, onLayoutChange]);
+  }, [layout, activeDrag, onLayoutChange, droppingItem.i]);
 
   // ============================================================================
   // Container Height
@@ -555,12 +562,11 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
 
       onDragProp(newLayout, oldDragItem, l, placeholder, data.e, data.node);
 
-      setLayout(
-        allowOverlap ? newLayout : compact(newLayout, compactType, cols)
-      );
+      // Use compactor.compact() - it handles allowOverlap internally (#2213)
+      setLayout(compactor.compact(newLayout, cols));
       setActiveDrag(placeholder);
     },
-    [preventCollision, compactType, cols, allowOverlap, onDragProp]
+    [preventCollision, compactType, cols, allowOverlap, compactor, onDragProp]
   );
 
   const onDragStop = useCallback(
@@ -584,9 +590,8 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         allowOverlap
       );
 
-      const finalLayout = allowOverlap
-        ? newLayout
-        : compact(newLayout, compactType, cols);
+      // Use compactor.compact() - it handles allowOverlap internally (#2213)
+      const finalLayout = compactor.compact(newLayout, cols);
 
       onDragStopProp(finalLayout, oldDragItem, l, null, data.e, data.node);
 
@@ -606,6 +611,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
       compactType,
       cols,
       allowOverlap,
+      compactor,
       onDragStopProp,
       onLayoutChange
     ]
@@ -721,12 +727,11 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         data.node
       );
 
-      setLayout(
-        allowOverlap ? finalLayout : compact(finalLayout, compactType, cols)
-      );
+      // Use compactor.compact() - it handles allowOverlap internally (#2213)
+      setLayout(compactor.compact(finalLayout, cols));
       setActiveDrag(placeholder);
     },
-    [preventCollision, allowOverlap, compactType, cols, onResizeProp]
+    [preventCollision, compactType, cols, allowOverlap, compactor, onResizeProp]
   );
 
   const onResizeStop = useCallback(
@@ -735,9 +740,8 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
       const oldResizeItem = oldResizeItemRef.current;
       const l = getLayoutItem(currentLayout, i);
 
-      const finalLayout = allowOverlap
-        ? currentLayout
-        : compact(currentLayout, compactType, cols);
+      // Use compactor.compact() - it handles allowOverlap internally (#2213)
+      const finalLayout = compactor.compact(currentLayout, cols);
 
       onResizeStopProp(
         finalLayout,
@@ -759,7 +763,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         onLayoutChange(finalLayout);
       }
     },
-    [allowOverlap, compactType, cols, onResizeStopProp, onLayoutChange]
+    [cols, compactor, onResizeStopProp, onLayoutChange]
   );
 
   // ============================================================================
@@ -767,19 +771,29 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
   // ============================================================================
 
   const removeDroppingPlaceholder = useCallback(() => {
+    // Guard against being called when there's no dropping item (#2210)
+    // This makes the function idempotent and safe to call multiple times
     const currentLayout = layoutRef.current;
-    const newLayout = compact(
+    const hasDroppingItem = currentLayout.some(l => l.i === droppingItem.i);
+    if (!hasDroppingItem) {
+      // Nothing to remove, just ensure state is clean
+      setDroppingDOMNode(null);
+      setActiveDrag(null);
+      setDroppingPosition(undefined);
+      return;
+    }
+
+    // Use compactor.compact() - it handles allowOverlap internally (#2213)
+    const newLayout = compactor.compact(
       currentLayout.filter(l => l.i !== droppingItem.i),
-      compactType,
-      cols,
-      allowOverlap
+      cols
     );
 
     setLayout(newLayout);
     setDroppingDOMNode(null);
     setActiveDrag(null);
     setDroppingPosition(undefined);
-  }, [droppingItem.i, compactType, cols, allowOverlap]);
+  }, [droppingItem.i, cols, compactor]);
 
   const handleDragOver = useCallback(
     (e: ReactDragEvent): void | false => {
@@ -796,8 +810,11 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         return false;
       }
 
-      // Extract dragOffsetX from result, or use empty object if void/undefined
-      const rawResult = onDropDragOverProp(e);
+      // Use dropConfig.onDragOver if provided, otherwise fall back to onDropDragOver prop (#2212)
+      // dropConfig.onDragOver uses native DragEvent, onDropDragOver uses React's DragEvent
+      const rawResult = dropConfigOnDragOver
+        ? dropConfigOnDragOver(e.nativeEvent as DragEvent)
+        : onDropDragOverProp(e);
       if (rawResult === false) {
         if (droppingDOMNode) {
           removeDroppingPlaceholder();
@@ -892,6 +909,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
       droppingDOMNode,
       droppingPosition,
       droppingItem,
+      dropConfigOnDragOver,
       onDropDragOverProp,
       removeDroppingPlaceholder,
       transformScale,
@@ -909,6 +927,12 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
       e.preventDefault();
       e.stopPropagation();
       dragEnterCounterRef.current--;
+
+      // Guard against negative counter (#2210)
+      // This can happen in edge cases with event timing or bubbling
+      if (dragEnterCounterRef.current < 0) {
+        dragEnterCounterRef.current = 0;
+      }
 
       if (dragEnterCounterRef.current === 0) {
         removeDroppingPlaceholder();
@@ -988,6 +1012,8 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
           useCSSTransforms={useCSSTransforms && mounted}
           usePercentages={!mounted}
           transformScale={transformScale}
+          positionStrategy={positionStrategy}
+          dragThreshold={dragThreshold}
           w={l.w}
           h={l.h}
           x={l.x}
@@ -1031,6 +1057,8 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
       useCSSTransforms,
       mounted,
       transformScale,
+      positionStrategy,
+      dragThreshold,
       droppingPosition,
       resizeHandles,
       resizeHandle,

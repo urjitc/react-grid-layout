@@ -136,13 +136,16 @@ import ReactGridLayout, {
 
 // Core utilities (framework-agnostic)
 import {
-  compact,
   moveElement,
   collides,
   transformStrategy,
   absoluteStrategy,
-  createScaledStrategy
+  createScaledStrategy,
+  getCompactor,
+  verticalCompactor,
+  horizontalCompactor
 } from "react-grid-layout/core";
+// Note: compact() is not exported. Use compactor.compact() instead.
 
 // Legacy v1 API (100% backwards compatible, flat props)
 import ReactGridLayout, {
@@ -335,6 +338,28 @@ dist/
 ## Bug Reporting
 
 Users should reproduce bugs in CodeSandbox: https://codesandbox.io/p/sandbox/5ywf7c
+
+## Custom Skills
+
+### `/fix-issue <number>`
+
+Automated bug fixing workflow. Usage:
+
+```
+/fix-issue 2203
+```
+
+This skill will:
+
+1. Fetch and analyze the GitHub issue
+2. Investigate the codebase to find the root cause
+3. Write a failing test that reproduces the bug
+4. Implement the fix
+5. Verify all tests pass
+6. Create a PR and wait for CI
+7. Merge when green
+
+The skill enforces test-driven development: the test must fail before the fix is applied.
 
 ## RFC & Design Document
 

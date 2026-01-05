@@ -255,10 +255,6 @@ export type OnLayoutChangeCallback = (layout: Layout) => void;
  *   compact(layout, cols) {
  *     // Custom compaction logic
  *     return compactedLayout;
- *   },
- *   onMove(layout, item, x, y, cols) {
- *     // Handle item movement
- *     return updatedLayout;
  *   }
  * };
  * ```
@@ -297,24 +293,6 @@ export interface Compactor {
    * @returns The compacted layout
    */
   compact(layout: Layout, cols: number): Layout;
-
-  /**
-   * Handle item movement, returning the updated layout.
-   *
-   * @param layout - Current layout
-   * @param item - The item being moved
-   * @param x - New x position
-   * @param y - New y position
-   * @param cols - Number of columns
-   * @returns Updated layout after the move
-   */
-  onMove(
-    layout: Layout,
-    item: LayoutItem,
-    x: number,
-    y: number,
-    cols: number
-  ): Layout;
 }
 
 /**
@@ -353,13 +331,17 @@ export interface PositionStrategy {
   /**
    * Calculate position during drag operations, accounting for transforms and scale.
    *
+   * This method is optional. When not provided, react-draggable uses its built-in
+   * parent-relative coordinate calculation. Only override this when you need custom
+   * coordinate handling, such as for scaled containers.
+   *
    * @param clientX - Mouse client X position
    * @param clientY - Mouse client Y position
    * @param offsetX - Offset from element origin X
    * @param offsetY - Offset from element origin Y
    * @returns Adjusted left/top position
    */
-  calcDragPosition(
+  calcDragPosition?(
     clientX: number,
     clientY: number,
     offsetX: number,

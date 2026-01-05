@@ -6,6 +6,7 @@ import _ from "lodash";
 import TestUtils from "react-dom/test-utils";
 import { render, screen, act } from "@testing-library/react";
 import ReactGridLayout from "../../src/legacy/ReactGridLayout";
+import { GridLayout as GridLayoutV2 } from "../../src/react/components/GridLayout";
 import { GridItem } from "../../src/react/components/GridItem";
 import ResponsiveReactGridLayout from "../../src/legacy/ResponsiveReactGridLayout";
 import BasicLayout from "../examples/01-basic";
@@ -805,6 +806,54 @@ describe("Lifecycle tests", function () {
         expect(hasDroppedItem).toBe(false);
       });
 
+      // #2212 - dropConfig.onDragOver should be used
+      it("calls dropConfig.onDragOver when provided (v2 API) (#2212)", function () {
+        const onDragOver = jest.fn(() => ({ w: 3, h: 3 }));
+        const onLayoutChange = jest.fn();
+
+        // Use GridLayoutV2 (the v2 API component) directly to test dropConfig.onDragOver
+        const { container } = render(
+          <GridLayoutV2
+            className="layout"
+            gridConfig={{ cols: 12, rowHeight: 30 }}
+            width={1200}
+            layout={[{ i: "a", x: 0, y: 0, w: 2, h: 2 }]}
+            dropConfig={{ enabled: true, onDragOver }}
+            onLayoutChange={onLayoutChange}
+          >
+            <div key="a">a</div>
+          </GridLayoutV2>
+        );
+
+        const grid = container.querySelector(".react-grid-layout");
+        act(() => {
+          TestUtils.Simulate.dragOver(grid, {
+            currentTarget: {
+              getBoundingClientRect: () => ({ left: 0, top: 0 })
+            },
+            clientX: 200,
+            clientY: 150,
+            nativeEvent: {
+              target: document.createElement("div")
+            }
+          });
+        });
+
+        // dropConfig.onDragOver should be called
+        expect(onDragOver).toHaveBeenCalled();
+        // The dropping placeholder should be rendered in the DOM but NOT in onLayoutChange
+        // (it's transient internal state that shouldn't be exposed to users until drop)
+        // Verify it's in the DOM (internal state) - original + dropping
+        expect(container.querySelectorAll(".react-grid-item").length).toBe(2);
+
+        // But it should NOT be in onLayoutChange (public state)
+        const layoutCalls = onLayoutChange.mock.calls;
+        const droppingItemInLayoutChange = layoutCalls
+          .flatMap(call => call[0])
+          .find(item => item.i === "__dropping-elem__");
+        expect(droppingItemInLayoutChange).toBeUndefined();
+      });
+
       it("does not cause Maximum update depth exceeded on drag over (#2204)", function () {
         // This test verifies the fix for issue #2204 where dragOver would cause
         // an infinite update loop because the sync useEffect would remove the
@@ -849,12 +898,488 @@ describe("Lifecycle tests", function () {
         });
 
         // If we get here without timing out, the fix is working
-        // Verify that the dropping placeholder was added to layout
+        // Verify that the dropping item was added to internal state (original item + dropping item + placeholder = 3)
+        // The grid has: 1 original item, 1 dropping item, and 1 active placeholder
+        expect(
+          container.querySelectorAll(".react-grid-item").length
+        ).toBeGreaterThanOrEqual(2);
+
+        // But the dropping item should NOT be in onLayoutChange (public state) - this is expected behavior
+        // since #2210 fix: dropping placeholder is transient internal state
         const layoutCalls = onLayoutChange.mock.calls;
-        const hasDroppedItem = layoutCalls.some(call =>
+        const hasDroppedItemInPublicLayout = layoutCalls.some(call =>
           call[0].some(item => item.i === "__dropping-elem__")
         );
-        expect(hasDroppedItem).toBe(true);
+        expect(hasDroppedItemInPublicLayout).toBe(false);
+      });
+
+      it("does not cause Maximum update depth exceeded when dragging in then out (#2210)", function () {
+        // This test verifies the fix for issue #2210 where dragging an item INTO
+        // the grid and then moving it OUTSIDE without releasing the mouse button
+        // would cause an infinite update loop.
+        //
+        // The scenario is:
+        // 1. Drag an external item over the grid (creates dropping placeholder)
+        // 2. Move the item outside the grid (triggers dragLeave)
+        // 3. The dropping placeholder is removed but this triggers state updates
+        //    that cause the GridItem's useEffect to fire with stale callbacks
+        const consoleError = jest
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+        const onLayoutChange = jest.fn();
+        const onDropDragOver = jest.fn(() => ({ w: 2, h: 2 }));
+        const onDrag = jest.fn();
+        const onDragStart = jest.fn();
+
+        const { container } = render(
+          <ReactGridLayout
+            className="layout"
+            cols={12}
+            rowHeight={30}
+            width={1200}
+            isDroppable={true}
+            onDropDragOver={onDropDragOver}
+            onLayoutChange={onLayoutChange}
+            onDrag={onDrag}
+            onDragStart={onDragStart}
+          >
+            <div key="a" data-grid={{ x: 0, y: 0, w: 2, h: 2 }}>
+              a
+            </div>
+          </ReactGridLayout>
+        );
+
+        const grid = container.querySelector(".react-grid-layout");
+
+        // Step 1: Drag into the grid (creates dropping placeholder)
+        act(() => {
+          TestUtils.Simulate.dragEnter(grid, {
+            clientX: 200,
+            clientY: 100
+          });
+        });
+
+        act(() => {
+          TestUtils.Simulate.dragOver(grid, {
+            currentTarget: {
+              getBoundingClientRect: () => ({ left: 0, top: 0 })
+            },
+            clientX: 200,
+            clientY: 100,
+            nativeEvent: {
+              target: document.createElement("div")
+            }
+          });
+        });
+
+        // Verify the dropping placeholder is rendered in the DOM (internal state)
+        // The grid has: 1 original item, 1 dropping item, and 1 active placeholder = 3
+        expect(
+          container.querySelectorAll(".react-grid-item").length
+        ).toBeGreaterThanOrEqual(2);
+
+        // But it should NOT be in onLayoutChange (public state) - this is expected behavior
+        // since #2210 fix: dropping placeholder is transient internal state
+        let layoutCalls = onLayoutChange.mock.calls;
+        let hasDroppedItemInPublicLayout = layoutCalls.some(call =>
+          call[0].some(item => item.i === "__dropping-elem__")
+        );
+        expect(hasDroppedItemInPublicLayout).toBe(false);
+
+        // Record how many times onDrag was called
+        const _dragCallsBefore = onDrag.mock.calls.length;
+
+        // Step 2: Move the item around inside the grid (multiple moves)
+        for (let i = 0; i < 5; i++) {
+          act(() => {
+            TestUtils.Simulate.dragOver(grid, {
+              currentTarget: {
+                getBoundingClientRect: () => ({ left: 0, top: 0 })
+              },
+              clientX: 200 + i * 20,
+              clientY: 100 + i * 20,
+              nativeEvent: {
+                target: document.createElement("div")
+              }
+            });
+          });
+        }
+
+        // Step 3: Drag leave (move outside the grid without releasing)
+        // This is where the infinite loop would occur in #2210
+        act(() => {
+          TestUtils.Simulate.dragLeave(grid, {
+            clientX: -100,
+            clientY: -100
+          });
+        });
+
+        // If we get here without timing out, the fix is working
+        // The dropping placeholder should have been removed from internal state (only 1 item now)
+        expect(container.querySelectorAll(".react-grid-item").length).toBe(1);
+
+        // And still should not be in public layout
+        layoutCalls = onLayoutChange.mock.calls;
+        const lastLayout = layoutCalls[layoutCalls.length - 1]?.[0] || [];
+        hasDroppedItemInPublicLayout = lastLayout.some(
+          item => item.i === "__dropping-elem__"
+        );
+        expect(hasDroppedItemInPublicLayout).toBe(false);
+
+        // Verify onDrag wasn't called excessively (would indicate infinite loop)
+        // We expect 5 drag calls from step 2, plus maybe a few more, but not 50+
+        const totalDragCalls = onDrag.mock.calls.length;
+        expect(totalDragCalls).toBeLessThan(50);
+
+        // Verify no "Maximum update depth exceeded" errors
+        const maxDepthErrors = consoleError.mock.calls.filter(call =>
+          call[0]?.includes?.("Maximum update depth exceeded")
+        );
+        expect(maxDepthErrors).toHaveLength(0);
+
+        consoleError.mockRestore();
+      });
+
+      // #2210 - Test with v2 API GridLayout directly
+      it("does not cause Maximum update depth exceeded with v2 API GridLayout (#2210)", function () {
+        const consoleError = jest
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+        const onLayoutChange = jest.fn();
+        const onDragOver = jest.fn(() => ({ w: 2, h: 2 }));
+        const onDrag = jest.fn();
+        const onDragStart = jest.fn();
+
+        const { container } = render(
+          <GridLayoutV2
+            className="layout"
+            gridConfig={{ cols: 12, rowHeight: 30 }}
+            width={1200}
+            layout={[{ i: "a", x: 0, y: 0, w: 2, h: 2 }]}
+            dropConfig={{ enabled: true, onDragOver }}
+            onLayoutChange={onLayoutChange}
+            onDrag={onDrag}
+            onDragStart={onDragStart}
+          >
+            <div key="a">a</div>
+          </GridLayoutV2>
+        );
+
+        const grid = container.querySelector(".react-grid-layout");
+
+        // Step 1: Drag into the grid (creates dropping placeholder)
+        act(() => {
+          TestUtils.Simulate.dragEnter(grid, {
+            clientX: 200,
+            clientY: 100
+          });
+        });
+
+        act(() => {
+          TestUtils.Simulate.dragOver(grid, {
+            currentTarget: {
+              getBoundingClientRect: () => ({ left: 0, top: 0 })
+            },
+            clientX: 200,
+            clientY: 100,
+            nativeEvent: {
+              target: document.createElement("div")
+            }
+          });
+        });
+
+        // Step 2: Move around inside multiple times
+        for (let i = 0; i < 5; i++) {
+          act(() => {
+            TestUtils.Simulate.dragOver(grid, {
+              currentTarget: {
+                getBoundingClientRect: () => ({ left: 0, top: 0 })
+              },
+              clientX: 200 + i * 30,
+              clientY: 100 + i * 30,
+              nativeEvent: {
+                target: document.createElement("div")
+              }
+            });
+          });
+        }
+
+        // Step 3: Drag out
+        act(() => {
+          TestUtils.Simulate.dragLeave(grid, {
+            clientX: -100,
+            clientY: -100
+          });
+        });
+
+        // Verify no "Maximum update depth exceeded" errors
+        const maxDepthErrors = consoleError.mock.calls.filter(call =>
+          call[0]?.includes?.("Maximum update depth exceeded")
+        );
+        expect(maxDepthErrors).toHaveLength(0);
+
+        consoleError.mockRestore();
+      });
+
+      // #2210 - Test with ResponsiveReactGridLayout
+      it("does not cause Maximum update depth exceeded with ResponsiveReactGridLayout (#2210)", function () {
+        const consoleError = jest
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+        const onLayoutChange = jest.fn();
+        const onDropDragOver = jest.fn(() => ({ w: 2, h: 2 }));
+
+        const { container } = render(
+          <ResponsiveReactGridLayout
+            className="layout"
+            cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+            breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+            rowHeight={30}
+            width={1200}
+            isDroppable={true}
+            onDropDragOver={onDropDragOver}
+            onLayoutChange={onLayoutChange}
+            layouts={{
+              lg: [{ i: "a", x: 0, y: 0, w: 2, h: 2 }]
+            }}
+          >
+            <div key="a">a</div>
+          </ResponsiveReactGridLayout>
+        );
+
+        const grid = container.querySelector(".react-grid-layout");
+
+        // Step 1: Drag into the grid (creates dropping placeholder)
+        act(() => {
+          TestUtils.Simulate.dragEnter(grid, {
+            clientX: 200,
+            clientY: 100
+          });
+        });
+
+        act(() => {
+          TestUtils.Simulate.dragOver(grid, {
+            currentTarget: {
+              getBoundingClientRect: () => ({ left: 0, top: 0 })
+            },
+            clientX: 200,
+            clientY: 100,
+            nativeEvent: {
+              target: document.createElement("div")
+            }
+          });
+        });
+
+        // Step 2: Move around inside
+        for (let i = 0; i < 3; i++) {
+          act(() => {
+            TestUtils.Simulate.dragOver(grid, {
+              currentTarget: {
+                getBoundingClientRect: () => ({ left: 0, top: 0 })
+              },
+              clientX: 200 + i * 20,
+              clientY: 100 + i * 20,
+              nativeEvent: {
+                target: document.createElement("div")
+              }
+            });
+          });
+        }
+
+        // Step 3: Drag out
+        act(() => {
+          TestUtils.Simulate.dragLeave(grid, {
+            clientX: -100,
+            clientY: -100
+          });
+        });
+
+        // Verify no "Maximum update depth exceeded" errors
+        const maxDepthErrors = consoleError.mock.calls.filter(call =>
+          call[0]?.includes?.("Maximum update depth exceeded")
+        );
+        expect(maxDepthErrors).toHaveLength(0);
+
+        consoleError.mockRestore();
+      });
+
+      // #2210 - Test controlled state with children derived from layout
+      it("does not cause Maximum update depth exceeded with controlled state where children derive from layout (#2210)", function () {
+        // This test replicates the exact scenario from the bug report:
+        // - User has controlled state where onLayoutChange updates their layout state
+        // - Children are memoized and derived from that state
+        // - Items start at x:0, y:0 with only 2 columns (causing compaction on each drag)
+        // - Dragging in, moving around, then dragging out should NOT cause infinite loops
+        const consoleError = jest
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+
+        function ControlledDroppableGrid() {
+          const [layouts, setLayouts] = React.useState([
+            { i: "0", x: 0, y: 0, w: 1, h: 2 },
+            { i: "1", x: 0, y: 0, w: 1, h: 2 },
+            { i: "2", x: 0, y: 0, w: 1, h: 2 },
+            { i: "3", x: 0, y: 0, w: 1, h: 2 },
+            { i: "4", x: 0, y: 0, w: 1, h: 2 }
+          ]);
+
+          const handleLayoutChange = React.useCallback(layout => {
+            setLayouts(layout);
+          }, []);
+
+          // Children derived from layouts - key part of the bug reproduction
+          const children = React.useMemo(() => {
+            return layouts.map(l => (
+              <div key={l.i} className="grid-item">
+                {l.i}
+              </div>
+            ));
+          }, [layouts]);
+
+          return (
+            <GridLayoutV2
+              className="layout"
+              layout={layouts}
+              gridConfig={{ cols: 2, rowHeight: 30 }}
+              width={400}
+              onLayoutChange={handleLayoutChange}
+              dropConfig={{
+                enabled: true,
+                defaultItem: { w: 1, h: 2 }
+              }}
+            >
+              {children}
+            </GridLayoutV2>
+          );
+        }
+
+        const { container } = render(<ControlledDroppableGrid />);
+        const grid = container.querySelector(".react-grid-layout");
+
+        // Step 1: Drag into the grid
+        act(() => {
+          TestUtils.Simulate.dragEnter(grid, {
+            clientX: 100,
+            clientY: 50
+          });
+        });
+
+        act(() => {
+          TestUtils.Simulate.dragOver(grid, {
+            currentTarget: {
+              getBoundingClientRect: () => ({ left: 0, top: 0 })
+            },
+            clientX: 100,
+            clientY: 50,
+            nativeEvent: {
+              target: document.createElement("div")
+            }
+          });
+        });
+
+        // Step 2: Move around inside the grid
+        for (let i = 0; i < 5; i++) {
+          act(() => {
+            TestUtils.Simulate.dragOver(grid, {
+              currentTarget: {
+                getBoundingClientRect: () => ({ left: 0, top: 0 })
+              },
+              clientX: 100 + i * 20,
+              clientY: 50 + i * 20,
+              nativeEvent: {
+                target: document.createElement("div")
+              }
+            });
+          });
+        }
+
+        // Step 3: Drag out without releasing (this is where the infinite loop occurred)
+        act(() => {
+          TestUtils.Simulate.dragLeave(grid, {
+            clientX: -100,
+            clientY: -100
+          });
+        });
+
+        // If we get here without timing out, the fix is working
+        // Verify no "Maximum update depth exceeded" errors
+        const maxDepthErrors = consoleError.mock.calls.filter(call =>
+          call[0]?.includes?.("Maximum update depth exceeded")
+        );
+        expect(maxDepthErrors).toHaveLength(0);
+
+        consoleError.mockRestore();
+      });
+
+      // #2210 - Test repeated drag in/out cycles
+      it("does not cause Maximum update depth exceeded during repeated drag in/out cycles (#2210)", function () {
+        // This test verifies that repeatedly dragging an item INTO and then OUT OF
+        // the grid (without releasing) doesn't cause infinite loops.
+        const consoleError = jest
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+        const onLayoutChange = jest.fn();
+        const onDropDragOver = jest.fn(() => ({ w: 2, h: 2 }));
+
+        const { container } = render(
+          <ReactGridLayout
+            className="layout"
+            cols={12}
+            rowHeight={30}
+            width={1200}
+            isDroppable={true}
+            onDropDragOver={onDropDragOver}
+            onLayoutChange={onLayoutChange}
+          >
+            <div key="a" data-grid={{ x: 0, y: 0, w: 2, h: 2 }}>
+              a
+            </div>
+          </ReactGridLayout>
+        );
+
+        const grid = container.querySelector(".react-grid-layout");
+
+        // Perform multiple drag in/out cycles
+        for (let cycle = 0; cycle < 5; cycle++) {
+          // Drag in
+          act(() => {
+            TestUtils.Simulate.dragEnter(grid, {
+              clientX: 200,
+              clientY: 100
+            });
+          });
+
+          // Move around inside
+          act(() => {
+            TestUtils.Simulate.dragOver(grid, {
+              currentTarget: {
+                getBoundingClientRect: () => ({ left: 0, top: 0 })
+              },
+              clientX: 200 + cycle * 10,
+              clientY: 100 + cycle * 10,
+              nativeEvent: {
+                target: document.createElement("div")
+              }
+            });
+          });
+
+          // Drag out (without releasing)
+          act(() => {
+            TestUtils.Simulate.dragLeave(grid, {
+              clientX: -100,
+              clientY: -100
+            });
+          });
+        }
+
+        // If we get here without timing out or crashing, the fix is working
+        // Verify no "Maximum update depth exceeded" errors
+        const maxDepthErrors = consoleError.mock.calls.filter(call =>
+          call[0]?.includes?.("Maximum update depth exceeded")
+        );
+        expect(maxDepthErrors).toHaveLength(0);
+
+        consoleError.mockRestore();
       });
     });
 
@@ -1797,6 +2322,372 @@ describe("Lifecycle tests", function () {
 
       // Style should have changed due to new position
       expect(styleAfter).not.toEqual(styleBefore);
+    });
+  });
+
+  // #2213 - Custom compactors should have their methods called
+  describe("Custom Compactors", function () {
+    it("calls custom compactor.compact() when layout changes (v2 API) (#2213)", function () {
+      const customCompact = jest.fn(layout => layout);
+
+      const customCompactor = {
+        type: "vertical",
+        allowOverlap: false,
+        preventCollision: false,
+        compact: customCompact
+      };
+
+      render(
+        <GridLayoutV2
+          className="layout"
+          gridConfig={{ cols: 12, rowHeight: 30 }}
+          width={1200}
+          layout={[
+            { i: "a", x: 0, y: 0, w: 2, h: 2 },
+            { i: "b", x: 2, y: 0, w: 2, h: 2 }
+          ]}
+          compactor={customCompactor}
+        >
+          <div key="a">a</div>
+          <div key="b">b</div>
+        </GridLayoutV2>
+      );
+
+      // The custom compactor's compact method should have been called
+      // during initial layout processing
+      expect(customCompact).toHaveBeenCalled();
+    });
+  });
+
+  // #2217 - PositionStrategy methods should be called
+  describe("Custom PositionStrategy", function () {
+    it("calls custom positionStrategy.calcStyle() for item positioning (v2 API)", function () {
+      const mockCalcStyle = jest.fn(pos => ({
+        transform: `translate(${pos.left}px, ${pos.top}px)`,
+        width: `${pos.width}px`,
+        height: `${pos.height}px`,
+        position: "absolute"
+      }));
+      const mockCalcDragPosition = jest.fn(
+        (clientX, clientY, offsetX, offsetY) => ({
+          left: clientX - offsetX,
+          top: clientY - offsetY
+        })
+      );
+
+      const customPositionStrategy = {
+        type: "transform",
+        scale: 1,
+        calcStyle: mockCalcStyle,
+        calcDragPosition: mockCalcDragPosition
+      };
+
+      render(
+        <GridLayoutV2
+          className="layout"
+          gridConfig={{ cols: 12, rowHeight: 30 }}
+          width={1200}
+          layout={[{ i: "a", x: 0, y: 0, w: 2, h: 2 }]}
+          positionStrategy={customPositionStrategy}
+        >
+          <div key="a">a</div>
+        </GridLayoutV2>
+      );
+
+      // The custom positionStrategy's calcStyle method should have been called
+      // for positioning the grid item
+      expect(mockCalcStyle).toHaveBeenCalled();
+    });
+
+    it("calls custom positionStrategy.calcDragPosition() during drag (v2 API)", function () {
+      const mockCalcStyle = jest.fn(pos => ({
+        transform: `translate(${pos.left}px, ${pos.top}px)`,
+        width: `${pos.width}px`,
+        height: `${pos.height}px`,
+        position: "absolute"
+      }));
+      const mockCalcDragPosition = jest.fn(
+        (clientX, clientY, offsetX, offsetY) => ({
+          left: clientX - offsetX,
+          top: clientY - offsetY
+        })
+      );
+
+      const customPositionStrategy = {
+        type: "transform",
+        scale: 1,
+        calcStyle: mockCalcStyle,
+        calcDragPosition: mockCalcDragPosition
+      };
+
+      const { container } = render(
+        <GridLayoutV2
+          className="layout"
+          gridConfig={{ cols: 12, rowHeight: 30 }}
+          width={1200}
+          layout={[{ i: "a", x: 0, y: 0, w: 2, h: 2 }]}
+          positionStrategy={customPositionStrategy}
+          dragConfig={{ enabled: true }}
+        >
+          <div key="a">a</div>
+        </GridLayoutV2>
+      );
+
+      const gridItem = container.querySelector(".react-grid-item");
+
+      // Start drag
+      act(() => {
+        dispatchMouseEvent(gridItem, "mousedown", {
+          clientX: 50,
+          clientY: 50
+        });
+      });
+
+      // Move during drag
+      act(() => {
+        mouseMove(150, 150, gridItem);
+      });
+
+      // The custom positionStrategy's calcDragPosition method should have been called
+      // during the drag operation
+      expect(mockCalcDragPosition).toHaveBeenCalled();
+
+      // Clean up - end drag
+      act(() => {
+        const mouseUpEvent = new MouseEvent("mouseup", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: 150,
+          clientY: 150,
+          button: 0
+        });
+        document.dispatchEvent(mouseUpEvent);
+      });
+    });
+  });
+
+  // #2217 - DragConfig.threshold should be respected
+  describe("DragConfig.threshold", function () {
+    it("does not start drag until mouse moves threshold pixels (v2 API)", function () {
+      const onDragStart = jest.fn();
+
+      const { container } = render(
+        <GridLayoutV2
+          className="layout"
+          gridConfig={{ cols: 12, rowHeight: 30 }}
+          width={1200}
+          layout={[{ i: "a", x: 0, y: 0, w: 2, h: 2 }]}
+          dragConfig={{ enabled: true, threshold: 10 }} // 10px threshold
+          onDragStart={onDragStart}
+        >
+          <div key="a">a</div>
+        </GridLayoutV2>
+      );
+
+      const gridItem = container.querySelector(".react-grid-item");
+
+      // Mousedown
+      act(() => {
+        dispatchMouseEvent(gridItem, "mousedown", {
+          clientX: 50,
+          clientY: 50
+        });
+      });
+
+      // Move only 5px (less than threshold)
+      act(() => {
+        mouseMove(55, 50, gridItem);
+      });
+
+      // onDragStart should NOT have been called yet
+      expect(onDragStart).not.toHaveBeenCalled();
+
+      // Move another 6px (total 11px, exceeds threshold)
+      act(() => {
+        mouseMove(61, 50, gridItem);
+      });
+
+      // NOW onDragStart should have been called
+      expect(onDragStart).toHaveBeenCalled();
+
+      // Clean up
+      act(() => {
+        const mouseUpEvent = new MouseEvent("mouseup", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: 61,
+          clientY: 50,
+          button: 0
+        });
+        document.dispatchEvent(mouseUpEvent);
+      });
+    });
+
+    it("uses default threshold of 3px when not specified (v2 API)", function () {
+      const onDragStart = jest.fn();
+
+      const { container } = render(
+        <GridLayoutV2
+          className="layout"
+          gridConfig={{ cols: 12, rowHeight: 30 }}
+          width={1200}
+          layout={[{ i: "a", x: 0, y: 0, w: 2, h: 2 }]}
+          dragConfig={{ enabled: true }} // No threshold specified, should use default 3
+          onDragStart={onDragStart}
+        >
+          <div key="a">a</div>
+        </GridLayoutV2>
+      );
+
+      const gridItem = container.querySelector(".react-grid-item");
+
+      // Mousedown
+      act(() => {
+        dispatchMouseEvent(gridItem, "mousedown", {
+          clientX: 50,
+          clientY: 50
+        });
+      });
+
+      // Move only 2px (less than default threshold of 3)
+      act(() => {
+        mouseMove(52, 50, gridItem);
+      });
+
+      // onDragStart should NOT have been called yet
+      expect(onDragStart).not.toHaveBeenCalled();
+
+      // Move another 2px (total 4px, exceeds default threshold of 3)
+      act(() => {
+        mouseMove(54, 50, gridItem);
+      });
+
+      // NOW onDragStart should have been called
+      expect(onDragStart).toHaveBeenCalled();
+
+      // Clean up
+      act(() => {
+        const mouseUpEvent = new MouseEvent("mouseup", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: 54,
+          clientY: 50,
+          button: 0
+        });
+        document.dispatchEvent(mouseUpEvent);
+      });
+    });
+  });
+
+  // Regression test for drag position jump bug
+  // Bug: Items would jump half a screen down when drag started because
+  // calcDragPosition returned screen coordinates instead of parent-relative
+  describe("Drag position bug regression", function () {
+    it("does not cause item to jump on drag start with default positionStrategy", function () {
+      const onDrag = jest.fn();
+      const onDragStart = jest.fn();
+
+      // Create a grid with known position - item at grid position (0,0)
+      // With width=1200, cols=12, rowHeight=30, margin=[10,10]
+      // Item w=2, h=2 should be at pixel position (10, 10) with size 190x60
+      const { container } = render(
+        <GridLayoutV2
+          className="layout"
+          gridConfig={{ cols: 12, rowHeight: 30, margin: [10, 10] }}
+          width={1200}
+          layout={[{ i: "a", x: 0, y: 0, w: 2, h: 2 }]}
+          dragConfig={{ enabled: true }}
+          onDrag={onDrag}
+          onDragStart={onDragStart}
+        >
+          <div key="a">a</div>
+        </GridLayoutV2>
+      );
+
+      const gridItem = container.querySelector(".react-grid-item");
+      const gridLayout = container.querySelector(".react-grid-layout");
+
+      // Mock getBoundingClientRect to simulate the grid being at y=500 on the page
+      // This is crucial - in jsdom, getBoundingClientRect returns zeros, so
+      // the bug wouldn't manifest. In real browsers, the grid could be anywhere
+      // on the page, and the bug would cause items to jump to screen position.
+      const originalGetBoundingClientRect =
+        gridLayout.getBoundingClientRect.bind(gridLayout);
+      gridLayout.getBoundingClientRect = () => ({
+        ...originalGetBoundingClientRect(),
+        top: 500, // Simulate grid is 500px from top of page
+        left: 0,
+        width: 1200,
+        height: 600
+      });
+
+      // Also mock the grid item's getBoundingClientRect
+      const originalItemGetBoundingClientRect =
+        gridItem.getBoundingClientRect.bind(gridItem);
+      gridItem.getBoundingClientRect = () => ({
+        ...originalItemGetBoundingClientRect(),
+        top: 510, // Item is at y=10 relative to grid, so 500+10=510 on page
+        left: 10,
+        width: 190,
+        height: 60
+      });
+
+      // Start drag - click at screen position (20, 520) which is inside the item
+      // The item is at screen position (10, 510) to (200, 570)
+      act(() => {
+        dispatchMouseEvent(gridItem, "mousedown", {
+          clientX: 20,
+          clientY: 520 // Screen Y position (500 grid offset + 20)
+        });
+      });
+
+      // Move a small amount (just enough to trigger drag start)
+      act(() => {
+        mouseMove(25, 525, gridItem);
+      });
+
+      // onDragStart should have been called
+      expect(onDragStart).toHaveBeenCalled();
+
+      // Now move a bit more
+      act(() => {
+        mouseMove(30, 530, gridItem);
+      });
+
+      // Verify onDrag was called
+      expect(onDrag).toHaveBeenCalled();
+
+      // Get the last onDrag call arguments
+      // onDrag signature: (layout, oldItem, newItem, placeholder, event, element)
+      const dragCall = onDrag.mock.calls[onDrag.mock.calls.length - 1];
+      const newItem = dragCall[2]; // The item being dragged
+
+      // The key test: verify the item hasn't jumped to a position way off from
+      // where it started. With the bug, calcDragPosition returns screen coordinates
+      // (clientY - offsetY = 520 - 10 = 510), which would be converted to grid
+      // position around y=12+ (510 / (30+10) = 12.75).
+      //
+      // Without the bug, the position is calculated parent-relative:
+      // (520 - 500 - offsetY_within_item) ≈ 10-20 pixels, which is y=0 in grid.
+      //
+      // Allow some tolerance since the mouse moved a bit.
+      expect(newItem.y).toBeLessThan(5); // Should be near top (y=0-1), not jumped to y=12+
+
+      // Clean up
+      act(() => {
+        const mouseUpEvent = new MouseEvent("mouseup", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: 30,
+          clientY: 530,
+          button: 0
+        });
+        document.dispatchEvent(mouseUpEvent);
+      });
     });
   });
 });
