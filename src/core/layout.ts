@@ -221,8 +221,7 @@ export function correctBounds(
       collidesWith.push(l);
     } else {
       // Static items that collide with other statics must be moved down
-      // Note: correctBounds doesn't have access to collisionThreshold, so it uses default 0
-      while (getFirstCollision(collidesWith, l, 0)) {
+      while (getFirstCollision(collidesWith, l)) {
         l.y++;
       }
     }
@@ -254,7 +253,6 @@ export function correctBounds(
  * @param compactType - Compaction type for collision resolution
  * @param cols - Number of columns in the grid
  * @param allowOverlap - True to allow items to stack on top of each other
- * @param collisionThreshold - Minimum overlap in grid units required for collision (default: 0)
  * @returns The updated layout
  */
 export function moveElement(
@@ -266,8 +264,7 @@ export function moveElement(
   preventCollision: boolean | undefined,
   compactType: CompactType,
   cols: number,
-  allowOverlap?: boolean,
-  collisionThreshold: number = 0
+  allowOverlap?: boolean
 ): LayoutItem[] {
   // Static items can't be moved unless explicitly draggable
   if (l.static && l.isDraggable !== true) {
@@ -300,7 +297,7 @@ export function moveElement(
     sorted = sorted.reverse();
   }
 
-  const collisions = getAllCollisions(sorted, l, collisionThreshold);
+  const collisions = getAllCollisions(sorted, l);
   const hasCollisions = collisions.length > 0;
 
   // Handle overlap mode - just clone and return
@@ -334,8 +331,7 @@ export function moveElement(
         l,
         isUserAction,
         compactType,
-        cols,
-        collisionThreshold
+        cols
       );
     } else {
       resultLayout = moveElementAwayFromCollision(
@@ -344,8 +340,7 @@ export function moveElement(
         collision,
         isUserAction,
         compactType,
-        cols,
-        collisionThreshold
+        cols
       );
     }
   }
@@ -365,7 +360,6 @@ export function moveElement(
  * @param isUserAction - True if this is a direct user action
  * @param compactType - Compaction type
  * @param cols - Number of columns
- * @param collisionThreshold - Minimum overlap in grid units required for collision (default: 0)
  * @returns Updated layout
  */
 export function moveElementAwayFromCollision(
@@ -374,8 +368,7 @@ export function moveElementAwayFromCollision(
   itemToMove: LayoutItem,
   isUserAction: boolean | undefined,
   compactType: CompactType,
-  cols: number,
-  collisionThreshold: number = 0
+  cols: number
 ): LayoutItem[] {
   const compactH = compactType === "horizontal";
   const compactV = compactType === "vertical";
@@ -394,11 +387,7 @@ export function moveElementAwayFromCollision(
       i: "-1"
     };
 
-    const firstCollision = getFirstCollision(
-      layout,
-      fakeItem,
-      collisionThreshold
-    );
+    const firstCollision = getFirstCollision(layout, fakeItem);
     const collisionNorth =
       firstCollision !== undefined &&
       firstCollision.y + firstCollision.h > collidesWith.y;
@@ -416,9 +405,7 @@ export function moveElementAwayFromCollision(
         isUserAction,
         preventCollision,
         compactType,
-        cols,
-        undefined,
-        collisionThreshold
+        cols
       );
     }
 
@@ -432,9 +419,7 @@ export function moveElementAwayFromCollision(
         isUserAction,
         preventCollision,
         compactType,
-        cols,
-        undefined,
-        collisionThreshold
+        cols
       );
     }
 
@@ -454,9 +439,7 @@ export function moveElementAwayFromCollision(
         isUserAction,
         preventCollision,
         compactType,
-        cols,
-        undefined,
-        collisionThreshold
+        cols
       );
     }
   }
@@ -477,9 +460,7 @@ export function moveElementAwayFromCollision(
     isUserAction,
     preventCollision,
     compactType,
-    cols,
-    undefined,
-    collisionThreshold
+    cols
   );
 }
 

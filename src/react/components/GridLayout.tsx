@@ -358,14 +358,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
   );
 
   // Destructure resolved configs for convenience
-  const {
-    cols,
-    rowHeight,
-    maxRows,
-    margin,
-    containerPadding,
-    collisionThreshold
-  } = gridConfig;
+  const { cols, rowHeight, maxRows, margin, containerPadding } = gridConfig;
   const {
     enabled: isDraggable,
     bounded: isBounded,
@@ -557,8 +550,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         preventCollision,
         compactType,
         cols,
-        allowOverlap,
-        collisionThreshold
+        allowOverlap
       );
 
       onDragProp(newLayout, oldDragItem, l, placeholder, data.e, data.node);
@@ -568,14 +560,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
       );
       setActiveDrag(placeholder);
     },
-    [
-      preventCollision,
-      compactType,
-      cols,
-      allowOverlap,
-      collisionThreshold,
-      onDragProp
-    ]
+    [preventCollision, compactType, cols, allowOverlap, onDragProp]
   );
 
   const onDragStop = useCallback(
@@ -596,8 +581,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         preventCollision,
         compactType,
         cols,
-        allowOverlap,
-        collisionThreshold
+        allowOverlap
       );
 
       const finalLayout = allowOverlap
@@ -679,17 +663,13 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
 
         // Check for collisions if preventCollision is enabled
         if (preventCollision && !allowOverlap) {
-          const collisions = getAllCollisions(
-            currentLayout,
-            {
-              ...item,
-              w,
-              h,
-              x: newX ?? item.x,
-              y: newY ?? item.y
-            },
-            collisionThreshold
-          ).filter(layoutItem => layoutItem.i !== item.i);
+          const collisions = getAllCollisions(currentLayout, {
+            ...item,
+            w,
+            h,
+            x: newX ?? item.x,
+            y: newY ?? item.y
+          }).filter(layoutItem => layoutItem.i !== item.i);
 
           if (collisions.length > 0) {
             newY = item.y;
@@ -719,8 +699,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
           preventCollision,
           compactType,
           cols,
-          allowOverlap,
-          collisionThreshold
+          allowOverlap
         );
       }
 
@@ -747,14 +726,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
       );
       setActiveDrag(placeholder);
     },
-    [
-      preventCollision,
-      allowOverlap,
-      compactType,
-      cols,
-      collisionThreshold,
-      onResizeProp
-    ]
+    [preventCollision, allowOverlap, compactType, cols, onResizeProp]
   );
 
   const onResizeStop = useCallback(

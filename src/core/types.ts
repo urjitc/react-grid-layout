@@ -478,14 +478,6 @@ export interface GridConfig {
 
   /** Maximum number of rows (default: Infinity) */
   maxRows: number;
-
-  /**
-   * Collision threshold in grid units.
-   * Items must overlap by at least this amount to be considered colliding.
-   * A value of 0 means any overlap is a collision (default behavior).
-   * @default 0
-   */
-  collisionThreshold: number;
 }
 
 /** Default grid configuration */
@@ -494,8 +486,7 @@ export const defaultGridConfig: GridConfig = {
   rowHeight: 150,
   margin: [10, 10],
   containerPadding: null,
-  maxRows: Infinity,
-  collisionThreshold: 0
+  maxRows: Infinity
 };
 
 /**
