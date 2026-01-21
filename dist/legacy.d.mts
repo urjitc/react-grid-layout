@@ -1,7 +1,7 @@
 import * as react_jsx_runtime from 'react/jsx-runtime';
 import React__default, { ComponentType } from 'react';
-import { a as GridLayoutProps, b as ResponsiveGridLayoutProps } from './ResponsiveGridLayout-BhbwC0hO.mjs';
-import { L as Layout, a as LayoutItem, C as CompactType, d as ResizeHandleAxis, B as Breakpoint, b as Breakpoints, R as ResponsiveLayouts } from './types-BiXsdXr7.mjs';
+import { a as GridLayoutProps, b as ResponsiveGridLayoutProps } from './ResponsiveGridLayout-D2OaRcK7.mjs';
+import { L as Layout, a as LayoutItem, C as CompactType, d as ResizeHandleAxis, B as Breakpoint, b as Breakpoints, R as ResponsiveLayouts } from './types-NasFLlu6.mjs';
 
 /**
  * Legacy props interface for backwards compatibility with v1 API.

@@ -2,9 +2,9 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-var chunkEDUGDHQE_js = require('./chunk-EDUGDHQE.js');
-var chunk55DQUWLA_js = require('./chunk-55DQUWLA.js');
-require('./chunk-A5WIFECI.js');
+var chunkLQL4ID67_js = require('./chunk-LQL4ID67.js');
+var chunkKDV5ZWJH_js = require('./chunk-KDV5ZWJH.js');
+require('./chunk-MQJQWSQQ.js');
 var react = require('react');
 var jsxRuntime = require('react/jsx-runtime');
 var clsx = require('clsx');
@@ -97,16 +97,16 @@ function ReactGridLayout(props) {
   };
   let positionStrategy;
   if (!useCSSTransforms) {
-    positionStrategy = chunk55DQUWLA_js.absoluteStrategy;
+    positionStrategy = chunkKDV5ZWJH_js.absoluteStrategy;
   } else if (transformScale !== 1) {
-    positionStrategy = chunk55DQUWLA_js.createScaledStrategy(transformScale);
+    positionStrategy = chunkKDV5ZWJH_js.createScaledStrategy(transformScale);
   } else {
-    positionStrategy = chunk55DQUWLA_js.transformStrategy;
+    positionStrategy = chunkKDV5ZWJH_js.transformStrategy;
   }
-  const compactor = chunk55DQUWLA_js.getCompactor(compactType, allowOverlap, preventCollision);
-  const constraints = isBounded ? [...chunk55DQUWLA_js.defaultConstraints, chunk55DQUWLA_js.containerBounds] : chunk55DQUWLA_js.defaultConstraints;
+  const compactor = chunkKDV5ZWJH_js.getCompactor(compactType, allowOverlap, preventCollision);
+  const constraints = isBounded ? [...chunkKDV5ZWJH_js.defaultConstraints, chunkKDV5ZWJH_js.containerBounds] : chunkKDV5ZWJH_js.defaultConstraints;
   return /* @__PURE__ */ jsxRuntime.jsx(
-    chunkEDUGDHQE_js.GridLayout,
+    chunkLQL4ID67_js.GridLayout,
     {
       width,
       gridConfig,
@@ -216,15 +216,15 @@ function ResponsiveReactGridLayout(props) {
   };
   let positionStrategy;
   if (!useCSSTransforms) {
-    positionStrategy = chunk55DQUWLA_js.absoluteStrategy;
+    positionStrategy = chunkKDV5ZWJH_js.absoluteStrategy;
   } else if (transformScale !== 1) {
-    positionStrategy = chunk55DQUWLA_js.createScaledStrategy(transformScale);
+    positionStrategy = chunkKDV5ZWJH_js.createScaledStrategy(transformScale);
   } else {
-    positionStrategy = chunk55DQUWLA_js.transformStrategy;
+    positionStrategy = chunkKDV5ZWJH_js.transformStrategy;
   }
-  const compactor = chunk55DQUWLA_js.getCompactor(compactType, allowOverlap, preventCollision);
+  const compactor = chunkKDV5ZWJH_js.getCompactor(compactType, allowOverlap, preventCollision);
   return /* @__PURE__ */ jsxRuntime.jsx(
-    chunkEDUGDHQE_js.ResponsiveGridLayout,
+    chunkLQL4ID67_js.ResponsiveGridLayout,
     {
       width,
       breakpoint,

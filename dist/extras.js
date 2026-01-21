@@ -1,6 +1,6 @@
 'use strict';
 
-var chunkA5WIFECI_js = require('./chunk-A5WIFECI.js');
+var chunkMQJQWSQQ_js = require('./chunk-MQJQWSQQ.js');
 var react = require('react');
 var jsxRuntime = require('react/jsx-runtime');
 
@@ -18,7 +18,7 @@ function GridBackground({
   style
 }) {
   const dims = react.useMemo(
-    () => chunkA5WIFECI_js.calcGridCellDimensions({
+    () => chunkMQJQWSQQ_js.calcGridCellDimensions({
       width,
       cols,
       rowHeight,
@@ -98,22 +98,24 @@ function compactVerticalFast(layout, cols, allowOverlap) {
     if (a.y > b.y) return 1;
     if (a.x < b.x) return -1;
     if (a.x > b.x) return 1;
-    if (a.static && !b.static) return -1;
-    if (!a.static && b.static) return 1;
+    const aImmovable = a.static || a.anchor;
+    const bImmovable = b.static || b.anchor;
+    if (aImmovable && !bImmovable) return -1;
+    if (!aImmovable && bImmovable) return 1;
     return 0;
   });
   const tide = new Array(cols).fill(0);
-  const staticItems = layout.filter((item) => item.static);
-  const numStatics = staticItems.length;
-  let staticOffset = 0;
+  const immovableItems = layout.filter((item) => item.static || item.anchor);
+  const numImmovables = immovableItems.length;
+  let immovableOffset = 0;
   for (let i = 0; i < numItems; i++) {
     const item = layout[i];
     let x2 = item.x + item.w;
     if (x2 > cols) {
       x2 = cols;
     }
-    if (item.static) {
-      ++staticOffset;
+    if (item.static || item.anchor) {
+      ++immovableOffset;
     } else {
       let minGap = Infinity;
       for (let x = item.x; x < x2; ++x) {
@@ -126,16 +128,16 @@ function compactVerticalFast(layout, cols, allowOverlap) {
       if (!allowOverlap || minGap > 0) {
         item.y -= minGap;
       }
-      for (let j = staticOffset; !allowOverlap && j < numStatics; ++j) {
-        const staticItem = staticItems[j];
-        if (staticItem === void 0) continue;
-        if (staticItem.y >= item.y + item.h) {
+      for (let j = immovableOffset; !allowOverlap && j < numImmovables; ++j) {
+        const immovableItem = immovableItems[j];
+        if (immovableItem === void 0) continue;
+        if (immovableItem.y >= item.y + item.h) {
           break;
         }
-        if (collides(item, staticItem)) {
-          item.y = staticItem.y + staticItem.h;
-          if (j > staticOffset) {
-            j = staticOffset;
+        if (collides(item, immovableItem)) {
+          item.y = immovableItem.y + immovableItem.h;
+          if (j > immovableOffset) {
+            j = immovableOffset;
           }
         }
       }
@@ -154,7 +156,7 @@ var fastVerticalCompactor = {
   type: "vertical",
   allowOverlap: false,
   compact(layout, cols) {
-    const out = chunkA5WIFECI_js.cloneLayout(layout);
+    const out = chunkMQJQWSQQ_js.cloneLayout(layout);
     compactVerticalFast(out, cols, false);
     return out;
   }
@@ -163,7 +165,7 @@ var fastVerticalOverlapCompactor = {
   ...fastVerticalCompactor,
   allowOverlap: true,
   compact(layout, cols) {
-    const out = chunkA5WIFECI_js.cloneLayout(layout);
+    const out = chunkMQJQWSQQ_js.cloneLayout(layout);
     compactVerticalFast(out, cols, true);
     return out;
   }
@@ -185,10 +187,10 @@ function getMaxTideForItem(tide, y, h) {
   }
   return maxTide;
 }
-function canPlaceAt(item, x, y, staticItems, cols) {
+function canPlaceAt(item, x, y, immovableItems, cols) {
   if (x + item.w > cols) return false;
-  for (const staticItem of staticItems) {
-    if (x < staticItem.x + staticItem.w && x + item.w > staticItem.x && y < staticItem.y + staticItem.h && y + item.h > staticItem.y) {
+  for (const immovableItem of immovableItems) {
+    if (x < immovableItem.x + immovableItem.w && x + item.w > immovableItem.x && y < immovableItem.y + immovableItem.h && y + item.h > immovableItem.y) {
       return false;
     }
   }
@@ -200,7 +202,9 @@ function compactHorizontalFast(layout, cols, allowOverlap) {
   layout.sort((a, b) => {
     if (a.x !== b.x) return a.x - b.x;
     if (a.y !== b.y) return a.y - b.y;
-    if (a.static !== b.static) return a.static ? -1 : 1;
+    const aImmovable = a.static || a.anchor;
+    const bImmovable = b.static || b.anchor;
+    if (aImmovable !== bImmovable) return aImmovable ? -1 : 1;
     return 0;
   });
   let maxRow = 0;
@@ -212,11 +216,11 @@ function compactHorizontalFast(layout, cols, allowOverlap) {
     }
   }
   const tide = new Array(maxRow).fill(0);
-  const staticItems = layout.filter((item) => item.static);
+  const immovableItems = layout.filter((item) => item.static || item.anchor);
   const maxRowLimit = Math.max(1e4, numItems * 100);
   for (let i = 0; i < numItems; i++) {
     const item = layout[i];
-    if (item.static) {
+    if (item.static || item.anchor) {
       ensureTideRows(tide, item.y + item.h);
       const t2 = item.x + item.w;
       for (let y = item.y; y < item.y + item.h; y++) {
@@ -234,25 +238,25 @@ function compactHorizontalFast(layout, cols, allowOverlap) {
       const maxTide = getMaxTideForItem(tide, targetY, item.h);
       targetX = maxTide;
       if (targetX + item.w <= cols) {
-        if (allowOverlap || canPlaceAt(item, targetX, targetY, staticItems, cols)) {
+        if (allowOverlap || canPlaceAt(item, targetX, targetY, immovableItems, cols)) {
           placed = true;
         } else {
-          let maxStaticRight = targetX;
+          let maxImmovableRight = targetX;
           let foundCollision = false;
-          for (const staticItem of staticItems) {
-            if (targetX < staticItem.x + staticItem.w && targetX + item.w > staticItem.x && targetY < staticItem.y + staticItem.h && targetY + item.h > staticItem.y) {
-              maxStaticRight = Math.max(
-                maxStaticRight,
-                staticItem.x + staticItem.w
+          for (const immovableItem of immovableItems) {
+            if (targetX < immovableItem.x + immovableItem.w && targetX + item.w > immovableItem.x && targetY < immovableItem.y + immovableItem.h && targetY + item.h > immovableItem.y) {
+              maxImmovableRight = Math.max(
+                maxImmovableRight,
+                immovableItem.x + immovableItem.w
               );
               foundCollision = true;
             }
           }
           if (foundCollision) {
-            targetX = maxStaticRight;
+            targetX = maxImmovableRight;
           }
           if (foundCollision && targetX + item.w <= cols) {
-            if (canPlaceAt(item, targetX, targetY, staticItems, cols)) {
+            if (canPlaceAt(item, targetX, targetY, immovableItems, cols)) {
               placed = true;
             } else {
               targetY++;
@@ -292,7 +296,7 @@ var fastHorizontalCompactor = {
   type: "horizontal",
   allowOverlap: false,
   compact(layout, cols) {
-    const out = chunkA5WIFECI_js.cloneLayout(layout);
+    const out = chunkMQJQWSQQ_js.cloneLayout(layout);
     compactHorizontalFast(out, cols, false);
     return out;
   }
@@ -301,7 +305,7 @@ var fastHorizontalOverlapCompactor = {
   ...fastHorizontalCompactor,
   allowOverlap: true,
   compact(layout, cols) {
-    const out = chunkA5WIFECI_js.cloneLayout(layout);
+    const out = chunkMQJQWSQQ_js.cloneLayout(layout);
     compactHorizontalFast(out, cols, true);
     return out;
   }
@@ -337,7 +341,7 @@ function compactWrap(layout, cols) {
   for (let i = 0; i < sorted.length; i++) {
     const sortedItem = sorted[i];
     if (sortedItem === void 0) continue;
-    const l = chunkA5WIFECI_js.cloneLayoutItem(sortedItem);
+    const l = chunkMQJQWSQQ_js.cloneLayoutItem(sortedItem);
     if (l.static) {
       const originalIndex2 = layout.indexOf(sortedItem);
       out[originalIndex2] = l;
@@ -375,7 +379,7 @@ var wrapOverlapCompactor = {
   ...wrapCompactor,
   allowOverlap: true,
   compact(layout, _cols) {
-    return chunkA5WIFECI_js.cloneLayout(layout);
+    return chunkMQJQWSQQ_js.cloneLayout(layout);
   }
 };
 

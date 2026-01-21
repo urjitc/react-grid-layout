@@ -1,4 +1,4 @@
-import { L as Layout, a as LayoutItem, C as CompactType, M as Mutable, c as Compactor, P as Position, d as ResizeHandleAxis, k as PositionStrategy } from './types-BiXsdXr7.mjs';
+import { L as Layout, a as LayoutItem, C as CompactType, M as Mutable, c as Compactor, P as Position, d as ResizeHandleAxis, k as PositionStrategy } from './types-NasFLlu6.mjs';
 
 /**
  * Core layout manipulation utilities.

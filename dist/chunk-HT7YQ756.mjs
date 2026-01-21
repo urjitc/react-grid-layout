@@ -1,5 +1,3 @@
-'use strict';
-
 // src/core/calculate.ts
 function calcGridColWidth(positionParams) {
   const { margin, containerPadding, containerWidth, cols } = positionParams;
@@ -203,6 +201,11 @@ function getLayoutItem(layout, id) {
 function getStatics(layout) {
   return layout.filter((l) => l.static === true);
 }
+function getImmovables(layout) {
+  return layout.filter(
+    (l) => l.static === true || l.anchor === true
+  );
+}
 function cloneLayoutItem(layoutItem) {
   return {
     i: layoutItem.i,
@@ -216,6 +219,7 @@ function cloneLayoutItem(layoutItem) {
     maxH: layoutItem.maxH,
     moved: Boolean(layoutItem.moved),
     static: Boolean(layoutItem.static),
+    anchor: Boolean(layoutItem.anchor),
     isDraggable: layoutItem.isDraggable,
     isResizable: layoutItem.isResizable,
     resizeHandles: layoutItem.resizeHandles,
@@ -257,7 +261,7 @@ function withLayoutItem(layout, itemKey, cb) {
   return [newLayout, item];
 }
 function correctBounds(layout, bounds) {
-  const collidesWith = getStatics(layout);
+  const collidesWith = getImmovables(layout);
   for (let i = 0; i < layout.length; i++) {
     const l = layout[i];
     if (l === void 0) continue;
@@ -311,7 +315,7 @@ function moveElement(layout, l, x, y, isUserAction, preventCollision, compactTyp
     const collision = collisions[i];
     if (collision === void 0) continue;
     if (collision.moved) continue;
-    if (collision.static) {
+    if (collision.static || collision.anchor) {
       resultLayout = moveElementAwayFromCollision(
         resultLayout,
         collision,
@@ -332,7 +336,7 @@ function moveElement(layout, l, x, y, isUserAction, preventCollision, compactTyp
 function moveElementAwayFromCollision(layout, collidesWith, itemToMove, isUserAction, compactType, cols) {
   const compactH = compactType === "horizontal";
   const compactV = compactType === "vertical";
-  const preventCollision = collidesWith.static;
+  const preventCollision = collidesWith.static || collidesWith.anchor;
   if (isUserAction) {
     isUserAction = false;
     const fakeItem = {
@@ -419,29 +423,4 @@ function validateLayout(layout, contextName = "Layout") {
   }
 }
 
-exports.bottom = bottom;
-exports.calcGridCellDimensions = calcGridCellDimensions;
-exports.calcGridColWidth = calcGridColWidth;
-exports.calcGridItemPosition = calcGridItemPosition;
-exports.calcGridItemWHPx = calcGridItemWHPx;
-exports.calcWH = calcWH;
-exports.calcWHRaw = calcWHRaw;
-exports.calcXY = calcXY;
-exports.calcXYRaw = calcXYRaw;
-exports.clamp = clamp;
-exports.cloneLayout = cloneLayout;
-exports.cloneLayoutItem = cloneLayoutItem;
-exports.collides = collides;
-exports.correctBounds = correctBounds;
-exports.getAllCollisions = getAllCollisions;
-exports.getFirstCollision = getFirstCollision;
-exports.getLayoutItem = getLayoutItem;
-exports.getStatics = getStatics;
-exports.modifyLayout = modifyLayout;
-exports.moveElement = moveElement;
-exports.moveElementAwayFromCollision = moveElementAwayFromCollision;
-exports.sortLayoutItems = sortLayoutItems;
-exports.sortLayoutItemsByColRow = sortLayoutItemsByColRow;
-exports.sortLayoutItemsByRowCol = sortLayoutItemsByRowCol;
-exports.validateLayout = validateLayout;
-exports.withLayoutItem = withLayoutItem;
+export { bottom, calcGridCellDimensions, calcGridColWidth, calcGridItemPosition, calcGridItemWHPx, calcWH, calcWHRaw, calcXY, calcXYRaw, clamp, cloneLayout, cloneLayoutItem, collides, correctBounds, getAllCollisions, getFirstCollision, getImmovables, getLayoutItem, getStatics, modifyLayout, moveElement, moveElementAwayFromCollision, sortLayoutItems, sortLayoutItemsByColRow, sortLayoutItemsByRowCol, validateLayout, withLayoutItem };

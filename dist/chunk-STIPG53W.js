@@ -1,15 +1,17 @@
-import { verticalCompactor, sortBreakpoints, getBreakpointFromWidth, getColsFromBreakpoint, findOrGenerateResponsiveLayout } from './chunk-KDANGDDL.mjs';
-import { correctBounds, cloneLayout, getLayoutItem, cloneLayoutItem, moveElement, bottom } from './chunk-76RTO6EO.mjs';
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { deepEqual } from 'fast-equals';
+'use strict';
+
+var chunkKDV5ZWJH_js = require('./chunk-KDV5ZWJH.js');
+var chunkMQJQWSQQ_js = require('./chunk-MQJQWSQQ.js');
+var react = require('react');
+var fastEquals = require('fast-equals');
 
 function useContainerWidth(options = {}) {
   const { measureBeforeMount = false, initialWidth = 1280 } = options;
-  const [width, setWidth] = useState(initialWidth);
-  const [mounted, setMounted] = useState(!measureBeforeMount);
-  const containerRef = useRef(null);
-  const observerRef = useRef(null);
-  const measureWidth = useCallback(() => {
+  const [width, setWidth] = react.useState(initialWidth);
+  const [mounted, setMounted] = react.useState(!measureBeforeMount);
+  const containerRef = react.useRef(null);
+  const observerRef = react.useRef(null);
+  const measureWidth = react.useCallback(() => {
     const node = containerRef.current;
     if (node) {
       const newWidth = node.offsetWidth;
@@ -19,7 +21,7 @@ function useContainerWidth(options = {}) {
       }
     }
   }, [mounted]);
-  useEffect(() => {
+  react.useEffect(() => {
     const node = containerRef.current;
     if (!node) return;
     measureWidth();
@@ -69,55 +71,55 @@ function useGridLayout(options) {
     cols,
     preventCollision = false,
     onLayoutChange,
-    compactor = verticalCompactor
+    compactor = chunkKDV5ZWJH_js.verticalCompactor
   } = options;
-  const isDraggingRef = useRef(false);
-  const [layout, setLayoutState] = useState(() => {
-    const corrected = correctBounds(cloneLayout(propsLayout), { cols });
+  const isDraggingRef = react.useRef(false);
+  const [layout, setLayoutState] = react.useState(() => {
+    const corrected = chunkMQJQWSQQ_js.correctBounds(chunkMQJQWSQQ_js.cloneLayout(propsLayout), { cols });
     return compactor.compact(corrected, cols);
   });
-  const [dragState, setDragState] = useState({
+  const [dragState, setDragState] = react.useState({
     activeDrag: null,
     oldDragItem: null,
     oldLayout: null
   });
-  const [resizeState, setResizeState] = useState({
+  const [resizeState, setResizeState] = react.useState({
     resizing: false,
     oldResizeItem: null,
     oldLayout: null
   });
-  const [dropState, setDropState] = useState({
+  const [dropState, setDropState] = react.useState({
     droppingDOMNode: null,
     droppingPosition: null
   });
-  const prevLayoutRef = useRef(layout);
-  const setLayout = useCallback(
+  const prevLayoutRef = react.useRef(layout);
+  const setLayout = react.useCallback(
     (newLayout) => {
-      const corrected = correctBounds(cloneLayout(newLayout), { cols });
+      const corrected = chunkMQJQWSQQ_js.correctBounds(chunkMQJQWSQQ_js.cloneLayout(newLayout), { cols });
       const compacted = compactor.compact(corrected, cols);
       setLayoutState(compacted);
     },
     [cols, compactor]
   );
-  useEffect(() => {
+  react.useEffect(() => {
     if (isDraggingRef.current) return;
-    if (!deepEqual(propsLayout, prevLayoutRef.current)) {
+    if (!fastEquals.deepEqual(propsLayout, prevLayoutRef.current)) {
       setLayout(propsLayout);
     }
   }, [propsLayout, setLayout]);
-  useEffect(() => {
-    if (!deepEqual(layout, prevLayoutRef.current)) {
+  react.useEffect(() => {
+    if (!fastEquals.deepEqual(layout, prevLayoutRef.current)) {
       prevLayoutRef.current = layout;
       onLayoutChange?.(layout);
     }
   }, [layout, onLayoutChange]);
-  const onDragStart = useCallback(
+  const onDragStart = react.useCallback(
     (itemId, x, y) => {
-      const item = getLayoutItem(layout, itemId);
+      const item = chunkMQJQWSQQ_js.getLayoutItem(layout, itemId);
       if (!item) return null;
       isDraggingRef.current = true;
       const placeholder = {
-        ...cloneLayoutItem(item),
+        ...chunkMQJQWSQQ_js.cloneLayoutItem(item),
         x,
         y,
         static: false,
@@ -125,22 +127,22 @@ function useGridLayout(options) {
       };
       setDragState({
         activeDrag: placeholder,
-        oldDragItem: cloneLayoutItem(item),
-        oldLayout: cloneLayout(layout)
+        oldDragItem: chunkMQJQWSQQ_js.cloneLayoutItem(item),
+        oldLayout: chunkMQJQWSQQ_js.cloneLayout(layout)
       });
       return placeholder;
     },
     [layout]
   );
-  const onDrag = useCallback(
+  const onDrag = react.useCallback(
     (itemId, x, y) => {
-      const item = getLayoutItem(layout, itemId);
+      const item = chunkMQJQWSQQ_js.getLayoutItem(layout, itemId);
       if (!item) return;
       setDragState((prev) => ({
         ...prev,
         activeDrag: prev.activeDrag ? { ...prev.activeDrag, x, y } : null
       }));
-      const newLayout = moveElement(
+      const newLayout = chunkMQJQWSQQ_js.moveElement(
         layout,
         item,
         x,
@@ -157,11 +159,11 @@ function useGridLayout(options) {
     },
     [layout, cols, compactor, preventCollision]
   );
-  const onDragStop = useCallback(
+  const onDragStop = react.useCallback(
     (itemId, x, y) => {
-      const item = getLayoutItem(layout, itemId);
+      const item = chunkMQJQWSQQ_js.getLayoutItem(layout, itemId);
       if (!item) return;
-      const newLayout = moveElement(
+      const newLayout = chunkMQJQWSQQ_js.moveElement(
         layout,
         item,
         x,
@@ -183,20 +185,20 @@ function useGridLayout(options) {
     },
     [layout, cols, compactor, preventCollision]
   );
-  const onResizeStart = useCallback(
+  const onResizeStart = react.useCallback(
     (itemId) => {
-      const item = getLayoutItem(layout, itemId);
+      const item = chunkMQJQWSQQ_js.getLayoutItem(layout, itemId);
       if (!item) return null;
       setResizeState({
         resizing: true,
-        oldResizeItem: cloneLayoutItem(item),
-        oldLayout: cloneLayout(layout)
+        oldResizeItem: chunkMQJQWSQQ_js.cloneLayoutItem(item),
+        oldLayout: chunkMQJQWSQQ_js.cloneLayout(layout)
       });
       return item;
     },
     [layout]
   );
-  const onResize = useCallback(
+  const onResize = react.useCallback(
     (itemId, w, h, x, y) => {
       const newLayout = layout.map((item) => {
         if (item.i === itemId) {
@@ -211,13 +213,13 @@ function useGridLayout(options) {
         }
         return item;
       });
-      const corrected = correctBounds(newLayout, { cols });
+      const corrected = chunkMQJQWSQQ_js.correctBounds(newLayout, { cols });
       const compacted = compactor.compact(corrected, cols);
       setLayoutState(compacted);
     },
     [layout, cols, compactor]
   );
-  const onResizeStop = useCallback(
+  const onResizeStop = react.useCallback(
     (itemId, w, h) => {
       onResize(itemId, w, h);
       setResizeState({
@@ -228,12 +230,12 @@ function useGridLayout(options) {
     },
     [onResize]
   );
-  const onDropDragOver = useCallback(
+  const onDropDragOver = react.useCallback(
     (droppingItem, position) => {
-      const existingItem = getLayoutItem(layout, droppingItem.i);
+      const existingItem = chunkMQJQWSQQ_js.getLayoutItem(layout, droppingItem.i);
       if (!existingItem) {
         const newLayout = [...layout, droppingItem];
-        const corrected = correctBounds(newLayout, { cols });
+        const corrected = chunkMQJQWSQQ_js.correctBounds(newLayout, { cols });
         const compacted = compactor.compact(corrected, cols);
         setLayoutState(compacted);
       }
@@ -245,7 +247,7 @@ function useGridLayout(options) {
     },
     [layout, cols, compactor]
   );
-  const onDropDragLeave = useCallback(() => {
+  const onDropDragLeave = react.useCallback(() => {
     const newLayout = layout.filter((item) => item.i !== "__dropping-elem__");
     setLayoutState(newLayout);
     setDropState({
@@ -253,7 +255,7 @@ function useGridLayout(options) {
       droppingPosition: null
     });
   }, [layout]);
-  const onDrop = useCallback(
+  const onDrop = react.useCallback(
     (droppingItem) => {
       const newLayout = layout.map((item) => {
         if (item.i === "__dropping-elem__") {
@@ -265,7 +267,7 @@ function useGridLayout(options) {
         }
         return item;
       });
-      const corrected = correctBounds(newLayout, { cols });
+      const corrected = chunkMQJQWSQQ_js.correctBounds(newLayout, { cols });
       const compacted = compactor.compact(corrected, cols);
       setLayoutState(compacted);
       setDropState({
@@ -275,7 +277,7 @@ function useGridLayout(options) {
     },
     [layout, cols, compactor]
   );
-  const containerHeight = useMemo(() => bottom(layout), [layout]);
+  const containerHeight = react.useMemo(() => chunkMQJQWSQQ_js.bottom(layout), [layout]);
   const isInteracting = dragState.activeDrag !== null || resizeState.resizing || dropState.droppingPosition !== null;
   return {
     layout,
@@ -317,43 +319,43 @@ function useResponsiveLayout(options) {
     breakpoints = DEFAULT_BREAKPOINTS,
     cols: colsConfig = DEFAULT_COLS,
     layouts: propsLayouts = {},
-    compactor = verticalCompactor,
+    compactor = chunkKDV5ZWJH_js.verticalCompactor,
     onBreakpointChange,
     onLayoutChange,
     onWidthChange
   } = options;
-  const sortedBreakpoints = useMemo(
-    () => sortBreakpoints(breakpoints),
+  const sortedBreakpoints = react.useMemo(
+    () => chunkKDV5ZWJH_js.sortBreakpoints(breakpoints),
     [breakpoints]
   );
-  const initialBreakpoint = useMemo(
-    () => getBreakpointFromWidth(breakpoints, width),
+  const initialBreakpoint = react.useMemo(
+    () => chunkKDV5ZWJH_js.getBreakpointFromWidth(breakpoints, width),
     // Only calculate on mount, not on width changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
-  const initialCols = useMemo(
-    () => getColsFromBreakpoint(initialBreakpoint, colsConfig),
+  const initialCols = react.useMemo(
+    () => chunkKDV5ZWJH_js.getColsFromBreakpoint(initialBreakpoint, colsConfig),
     [initialBreakpoint, colsConfig]
   );
-  const [breakpoint, setBreakpoint] = useState(initialBreakpoint);
-  const [cols, setCols] = useState(initialCols);
-  const [layouts, setLayoutsState] = useState(() => {
+  const [breakpoint, setBreakpoint] = react.useState(initialBreakpoint);
+  const [cols, setCols] = react.useState(initialCols);
+  const [layouts, setLayoutsState] = react.useState(() => {
     const cloned = {};
     for (const bp of sortedBreakpoints) {
       const layout2 = propsLayouts[bp];
       if (layout2) {
-        cloned[bp] = cloneLayout(layout2);
+        cloned[bp] = chunkMQJQWSQQ_js.cloneLayout(layout2);
       }
     }
     return cloned;
   });
-  const prevWidthRef = useRef(width);
-  const prevBreakpointRef = useRef(breakpoint);
-  const prevPropsLayoutsRef = useRef(propsLayouts);
-  const prevLayoutsRef = useRef(layouts);
-  const layout = useMemo(() => {
-    return findOrGenerateResponsiveLayout(
+  const prevWidthRef = react.useRef(width);
+  const prevBreakpointRef = react.useRef(breakpoint);
+  const prevPropsLayoutsRef = react.useRef(propsLayouts);
+  const prevLayoutsRef = react.useRef(layouts);
+  const layout = react.useMemo(() => {
+    return chunkKDV5ZWJH_js.findOrGenerateResponsiveLayout(
       layouts,
       breakpoints,
       breakpoint,
@@ -362,30 +364,30 @@ function useResponsiveLayout(options) {
       compactor
     );
   }, [layouts, breakpoints, breakpoint, cols, compactor]);
-  const setLayoutForBreakpoint = useCallback((bp, newLayout) => {
+  const setLayoutForBreakpoint = react.useCallback((bp, newLayout) => {
     setLayoutsState((prev) => ({
       ...prev,
-      [bp]: cloneLayout(newLayout)
+      [bp]: chunkMQJQWSQQ_js.cloneLayout(newLayout)
     }));
   }, []);
-  const setLayouts = useCallback((newLayouts) => {
+  const setLayouts = react.useCallback((newLayouts) => {
     const cloned = {};
     for (const bp of Object.keys(newLayouts)) {
       const layoutForBp = newLayouts[bp];
       if (layoutForBp) {
-        cloned[bp] = cloneLayout(layoutForBp);
+        cloned[bp] = chunkMQJQWSQQ_js.cloneLayout(layoutForBp);
       }
     }
     setLayoutsState(cloned);
   }, []);
-  useEffect(() => {
+  react.useEffect(() => {
     if (prevWidthRef.current === width) return;
     prevWidthRef.current = width;
-    const newBreakpoint = getBreakpointFromWidth(breakpoints, width);
-    const newCols = getColsFromBreakpoint(newBreakpoint, colsConfig);
+    const newBreakpoint = chunkKDV5ZWJH_js.getBreakpointFromWidth(breakpoints, width);
+    const newCols = chunkKDV5ZWJH_js.getColsFromBreakpoint(newBreakpoint, colsConfig);
     onWidthChange?.(width, [10, 10], newCols, null);
     if (newBreakpoint !== breakpoint) {
-      const newLayout = findOrGenerateResponsiveLayout(
+      const newLayout = chunkKDV5ZWJH_js.findOrGenerateResponsiveLayout(
         layouts,
         breakpoints,
         newBreakpoint,
@@ -413,14 +415,14 @@ function useResponsiveLayout(options) {
     onBreakpointChange,
     onWidthChange
   ]);
-  useEffect(() => {
-    if (!deepEqual(propsLayouts, prevPropsLayoutsRef.current)) {
+  react.useEffect(() => {
+    if (!fastEquals.deepEqual(propsLayouts, prevPropsLayoutsRef.current)) {
       setLayouts(propsLayouts);
       prevPropsLayoutsRef.current = propsLayouts;
     }
   }, [propsLayouts, setLayouts]);
-  useEffect(() => {
-    if (!deepEqual(layouts, prevLayoutsRef.current)) {
+  react.useEffect(() => {
+    if (!fastEquals.deepEqual(layouts, prevLayoutsRef.current)) {
       prevLayoutsRef.current = layouts;
       onLayoutChange?.(layout, layouts);
     }
@@ -436,4 +438,8 @@ function useResponsiveLayout(options) {
   };
 }
 
-export { DEFAULT_BREAKPOINTS, DEFAULT_COLS, useContainerWidth, useGridLayout, useResponsiveLayout };
+exports.DEFAULT_BREAKPOINTS = DEFAULT_BREAKPOINTS;
+exports.DEFAULT_COLS = DEFAULT_COLS;
+exports.useContainerWidth = useContainerWidth;
+exports.useGridLayout = useGridLayout;
+exports.useResponsiveLayout = useResponsiveLayout;

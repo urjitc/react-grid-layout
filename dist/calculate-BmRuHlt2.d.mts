@@ -1,4 +1,4 @@
-import { P as Position, d as ResizeHandleAxis } from './types-BiXsdXr7.js';
+import { P as Position, d as ResizeHandleAxis } from './types-NasFLlu6.mjs';
 
 /**
  * Grid calculation utilities.
