@@ -65,6 +65,22 @@ export function getStatics(layout: Layout): LayoutItem[] {
   return layout.filter((l): l is LayoutItem => l.static === true);
 }
 
+/**
+ * Get all immovable items from the layout (static and anchor items).
+ *
+ * These items act as obstacles during dragging and compaction:
+ * - Static items cannot be dragged or resized
+ * - Anchor items can be dragged/resized but act as obstacles for other items
+ *
+ * @param layout - Layout to filter
+ * @returns Array of immovable layout items (static and anchor)
+ */
+export function getImmovables(layout: Layout): LayoutItem[] {
+  return layout.filter(
+    (l): l is LayoutItem => l.static === true || l.anchor === true
+  );
+}
+
 // ============================================================================
 // Layout Cloning
 // ============================================================================
@@ -91,6 +107,7 @@ export function cloneLayoutItem(layoutItem: LayoutItem): LayoutItem {
     maxH: layoutItem.maxH,
     moved: Boolean(layoutItem.moved),
     static: Boolean(layoutItem.static),
+    anchor: Boolean(layoutItem.anchor),
     isDraggable: layoutItem.isDraggable,
     isResizable: layoutItem.isResizable,
     resizeHandles: layoutItem.resizeHandles,
@@ -200,7 +217,7 @@ export function correctBounds(
   layout: Mutable<LayoutItem>[],
   bounds: { cols: number }
 ): LayoutItem[] {
-  const collidesWith = getStatics(layout);
+  const collidesWith = getImmovables(layout);
 
   for (let i = 0; i < layout.length; i++) {
     const l = layout[i];
@@ -253,6 +270,8 @@ export function correctBounds(
  * @param compactType - Compaction type for collision resolution
  * @param cols - Number of columns in the grid
  * @param allowOverlap - True to allow items to stack on top of each other
+ * @param collisionThreshold - Collision threshold in grid units. Items can overlap by this amount before collision is detected.
+ *                              Higher values make collision detection more forgiving during drag. Default: 0 (exact overlap required)
  * @returns The updated layout
  */
 export function moveElement(
@@ -264,7 +283,8 @@ export function moveElement(
   preventCollision: boolean | undefined,
   compactType: CompactType,
   cols: number,
-  allowOverlap?: boolean
+  allowOverlap?: boolean,
+  collisionThreshold: number = 0
 ): LayoutItem[] {
   // Static items can't be moved unless explicitly draggable
   if (l.static && l.isDraggable !== true) {
@@ -297,7 +317,7 @@ export function moveElement(
     sorted = sorted.reverse();
   }
 
-  const collisions = getAllCollisions(sorted, l);
+  const collisions = getAllCollisions(sorted, l, collisionThreshold);
   const hasCollisions = collisions.length > 0;
 
   // Handle overlap mode - just clone and return
@@ -323,8 +343,8 @@ export function moveElement(
     // Skip already-moved items to prevent infinite loops
     if (collision.moved) continue;
 
-    // Static items can't be moved - move the dragged item instead
-    if (collision.static) {
+    // Static and anchor items can't be moved - move the dragged item instead
+    if (collision.static || collision.anchor) {
       resultLayout = moveElementAwayFromCollision(
         resultLayout,
         collision,
@@ -372,7 +392,7 @@ export function moveElementAwayFromCollision(
 ): LayoutItem[] {
   const compactH = compactType === "horizontal";
   const compactV = compactType === "vertical";
-  const preventCollision = collidesWith.static;
+  const preventCollision = collidesWith.static || collidesWith.anchor;
 
   // Try to move up/left first (only on primary collision from user action)
   if (isUserAction) {
