@@ -270,8 +270,6 @@ export function correctBounds(
  * @param compactType - Compaction type for collision resolution
  * @param cols - Number of columns in the grid
  * @param allowOverlap - True to allow items to stack on top of each other
- * @param collisionThreshold - Collision threshold in grid units. Items can overlap by this amount before collision is detected.
- *                              Higher values make collision detection more forgiving during drag. Default: 0 (exact overlap required)
  * @returns The updated layout
  */
 export function moveElement(
@@ -283,8 +281,7 @@ export function moveElement(
   preventCollision: boolean | undefined,
   compactType: CompactType,
   cols: number,
-  allowOverlap?: boolean,
-  collisionThreshold: number = 0
+  allowOverlap?: boolean
 ): LayoutItem[] {
   // Static items can't be moved unless explicitly draggable
   if (l.static && l.isDraggable !== true) {
@@ -317,7 +314,7 @@ export function moveElement(
     sorted = sorted.reverse();
   }
 
-  const collisions = getAllCollisions(sorted, l, collisionThreshold);
+  const collisions = getAllCollisions(sorted, l);
   const hasCollisions = collisions.length > 0;
 
   // Handle overlap mode - just clone and return

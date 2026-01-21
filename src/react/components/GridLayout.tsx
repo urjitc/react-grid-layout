@@ -550,8 +550,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         preventCollision,
         compactType,
         cols,
-        allowOverlap,
-        0.5 // collisionThreshold: items can overlap by 0.5 grid units before collision
+        allowOverlap
       );
 
       onDragProp(newLayout, oldDragItem, l, placeholder, data.e, data.node);
@@ -572,8 +571,6 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
       const l = getLayoutItem(currentLayout, i);
       if (!l) return;
 
-      // On drop: use strict collision detection (threshold = 0)
-      // This ensures items don't actually overlap in the final layout
       const newLayout = moveElement(
         currentLayout,
         l,
@@ -583,8 +580,7 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         preventCollision,
         compactType,
         cols,
-        allowOverlap,
-        0 // collisionThreshold = 0 on drop for strict collision detection
+        allowOverlap
       );
 
       // Use compactor.compact() - it handles allowOverlap internally (#2213)
