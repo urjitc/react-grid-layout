@@ -62,25 +62,27 @@ function compactVerticalFast(
   const numItems = layout.length;
 
   // Sort items by position: top-to-bottom, left-to-right
-  // Static items are sorted first at each position to reduce collision checks
+  // Static and anchor items are sorted first at each position to reduce collision checks
   layout.sort((a, b) => {
     if (a.y < b.y) return -1;
     if (a.y > b.y) return 1;
     if (a.x < b.x) return -1;
     if (a.x > b.x) return 1;
-    // Static items sorted first to reduce collision checks
-    if (a.static && !b.static) return -1;
-    if (!a.static && b.static) return 1;
+    // Static and anchor items sorted first to reduce collision checks
+    const aImmovable = a.static || a.anchor;
+    const bImmovable = b.static || b.anchor;
+    if (aImmovable && !bImmovable) return -1;
+    if (!aImmovable && bImmovable) return 1;
     return 0;
   });
 
   // "Rising tide" - tracks the highest blocked row per column
   const tide: number[] = new Array(cols).fill(0);
 
-  // Collect static items for collision checking
-  const staticItems = layout.filter(item => item.static);
-  const numStatics = staticItems.length;
-  let staticOffset = 0;
+  // Collect static and anchor items for collision checking
+  const immovableItems = layout.filter(item => item.static || item.anchor);
+  const numImmovables = immovableItems.length;
+  let immovableOffset = 0;
 
   for (let i = 0; i < numItems; i++) {
     const item = layout[i] as Mutable<LayoutItem>;
@@ -91,10 +93,10 @@ function compactVerticalFast(
       x2 = cols;
     }
 
-    if (item.static) {
-      // Static items don't move; they become part of the tide
+    if (item.static || item.anchor) {
+      // Static and anchor items don't move; they become part of the tide
       // and don't need collision checks against themselves
-      ++staticOffset;
+      ++immovableOffset;
     } else {
       // Find the minimum gap between the item and the tide
       let minGap = Infinity;
@@ -111,25 +113,25 @@ function compactVerticalFast(
         item.y -= minGap;
       }
 
-      // Handle collisions with static items
-      for (let j = staticOffset; !allowOverlap && j < numStatics; ++j) {
-        const staticItem = staticItems[j];
-        if (staticItem === undefined) continue;
+      // Handle collisions with static and anchor items
+      for (let j = immovableOffset; !allowOverlap && j < numImmovables; ++j) {
+        const immovableItem = immovableItems[j];
+        if (immovableItem === undefined) continue;
 
-        // Early exit: if static item is below current item, no more collisions possible
-        if (staticItem.y >= item.y + item.h) {
+        // Early exit: if immovable item is below current item, no more collisions possible
+        if (immovableItem.y >= item.y + item.h) {
           break;
         }
 
-        if (collides(item, staticItem)) {
-          // Move current item below the static item
-          item.y = staticItem.y + staticItem.h;
+        if (collides(item, immovableItem)) {
+          // Move current item below the immovable item
+          item.y = immovableItem.y + immovableItem.h;
 
-          if (j > staticOffset) {
-            // Item was moved; need to recheck with earlier static items
-            // Note: j = staticOffset means after ++j we start at staticOffset + 1,
-            // but staticItems[staticOffset] was already checked or is above us
-            j = staticOffset;
+          if (j > immovableOffset) {
+            // Item was moved; need to recheck with earlier immovable items
+            // Note: j = immovableOffset means after ++j we start at immovableOffset + 1,
+            // but immovableItems[immovableOffset] was already checked or is above us
+            j = immovableOffset;
           }
         }
       }

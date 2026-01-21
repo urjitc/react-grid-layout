@@ -136,6 +136,7 @@ function MyGrid() {
 1. [Messy Layout Autocorrect](https://react-grid-layout.github.io/react-grid-layout/examples/03-messy.html)
 1. [Layout Defined on Children](https://react-grid-layout.github.io/react-grid-layout/examples/04-grid-property.html)
 1. [Static Elements](https://react-grid-layout.github.io/react-grid-layout/examples/05-static-elements.html)
+1. [Anchor Elements](./docs/ANCHOR_ITEMS.md) - Items that act as obstacles but can be dragged
 1. [Adding/Removing Elements](https://react-grid-layout.github.io/react-grid-layout/examples/06-dynamic-add-remove.html)
 1. [Saving Layout to LocalStorage](https://react-grid-layout.github.io/react-grid-layout/examples/07-localstorage.html)
 1. [Saving a Responsive Layout to LocalStorage](https://react-grid-layout.github.io/react-grid-layout/examples/08-localstorage-responsive.html)
@@ -174,6 +175,7 @@ _Know of others? Create a PR to let me know!_
 - Draggable widgets
 - Resizable widgets
 - Static widgets
+- Anchor widgets (draggable but act as obstacles)
 - Configurable packing: horizontal, vertical, or off
 - Bounds checking for dragging and resizing
 - Widgets may be added or removed without rebuilding grid
@@ -789,6 +791,7 @@ interface LayoutItem {
   minH?: number; // Minimum height (default: 0)
   maxH?: number; // Maximum height (default: Infinity)
   static?: boolean; // If true, not draggable or resizable
+  anchor?: boolean; // If true, acts as obstacle but can be dragged/resized
   isDraggable?: boolean; // Override grid isDraggable
   isResizable?: boolean; // Override grid isResizable
   isBounded?: boolean; // Override grid isBounded

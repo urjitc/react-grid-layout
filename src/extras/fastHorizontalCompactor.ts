@@ -50,25 +50,25 @@ function getMaxTideForItem(tide: number[], y: number, h: number): number {
 }
 
 /**
- * Check if an item can be placed at a given position without colliding with static items.
+ * Check if an item can be placed at a given position without colliding with static or anchor items.
  */
 function canPlaceAt(
   item: LayoutItem,
   x: number,
   y: number,
-  staticItems: LayoutItem[],
+  immovableItems: LayoutItem[],
   cols: number
 ): boolean {
   // Check grid bounds
   if (x + item.w > cols) return false;
 
-  // Check static collisions
-  for (const staticItem of staticItems) {
+  // Check static and anchor collisions
+  for (const immovableItem of immovableItems) {
     if (
-      x < staticItem.x + staticItem.w &&
-      x + item.w > staticItem.x &&
-      y < staticItem.y + staticItem.h &&
-      y + item.h > staticItem.y
+      x < immovableItem.x + immovableItem.w &&
+      x + item.w > immovableItem.x &&
+      y < immovableItem.y + immovableItem.h &&
+      y + item.h > immovableItem.y
     ) {
       return false;
     }
@@ -101,11 +101,13 @@ function compactHorizontalFast(
   if (numItems === 0) return;
 
   // Sort items by column then row (same as standard horizontal compactor)
-  // Static items are sorted first at each position to reduce collision checks
+  // Static and anchor items are sorted first at each position to reduce collision checks
   layout.sort((a, b) => {
     if (a.x !== b.x) return a.x - b.x;
     if (a.y !== b.y) return a.y - b.y;
-    if (a.static !== b.static) return a.static ? -1 : 1;
+    const aImmovable = a.static || a.anchor;
+    const bImmovable = b.static || b.anchor;
+    if (aImmovable !== bImmovable) return aImmovable ? -1 : 1;
     return 0;
   });
 
@@ -123,8 +125,8 @@ function compactHorizontalFast(
   // Pre-allocate based on max row extent to avoid repeated reallocations
   const tide: number[] = new Array(maxRow).fill(0);
 
-  // Collect static items for collision checking
-  const staticItems = layout.filter(item => item.static);
+  // Collect static and anchor items for collision checking
+  const immovableItems = layout.filter(item => item.static || item.anchor);
 
   // Safety limit for row wrapping (prevents infinite loops)
   // Use a limit relative to layout size (at least 10_000, or 100x the number of items)
@@ -133,8 +135,8 @@ function compactHorizontalFast(
   for (let i = 0; i < numItems; i++) {
     const item = layout[i] as Mutable<LayoutItem>;
 
-    if (item.static) {
-      // Static items don't move; they become part of the tide
+    if (item.static || item.anchor) {
+      // Static and anchor items don't move; they become part of the tide
       ensureTideRows(tide, item.y + item.h);
       const t = item.x + item.w;
       for (let y = item.y; y < item.y + item.h; y++) {
@@ -162,38 +164,38 @@ function compactHorizontalFast(
 
       // Check if item fits within grid bounds
       if (targetX + item.w <= cols) {
-        // Check for static item collisions
+        // Check for static and anchor item collisions
         if (
           allowOverlap ||
-          canPlaceAt(item, targetX, targetY, staticItems, cols)
+          canPlaceAt(item, targetX, targetY, immovableItems, cols)
         ) {
           placed = true;
         } else {
-          // Find the rightmost static collision and try past it
-          let maxStaticRight = targetX;
+          // Find the rightmost immovable collision and try past it
+          let maxImmovableRight = targetX;
           let foundCollision = false;
-          for (const staticItem of staticItems) {
+          for (const immovableItem of immovableItems) {
             if (
-              targetX < staticItem.x + staticItem.w &&
-              targetX + item.w > staticItem.x &&
-              targetY < staticItem.y + staticItem.h &&
-              targetY + item.h > staticItem.y
+              targetX < immovableItem.x + immovableItem.w &&
+              targetX + item.w > immovableItem.x &&
+              targetY < immovableItem.y + immovableItem.h &&
+              targetY + item.h > immovableItem.y
             ) {
-              maxStaticRight = Math.max(
-                maxStaticRight,
-                staticItem.x + staticItem.w
+              maxImmovableRight = Math.max(
+                maxImmovableRight,
+                immovableItem.x + immovableItem.w
               );
               foundCollision = true;
             }
           }
           if (foundCollision) {
-            targetX = maxStaticRight;
+            targetX = maxImmovableRight;
           }
 
-          // After moving past static, check if we still fit
+          // After moving past immovable, check if we still fit
           if (foundCollision && targetX + item.w <= cols) {
             // Verify no more collisions at new position
-            if (canPlaceAt(item, targetX, targetY, staticItems, cols)) {
+            if (canPlaceAt(item, targetX, targetY, immovableItems, cols)) {
               placed = true;
             } else {
               // Can't fit in this row, wrap to next

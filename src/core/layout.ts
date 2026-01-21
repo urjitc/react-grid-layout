@@ -65,6 +65,22 @@ export function getStatics(layout: Layout): LayoutItem[] {
   return layout.filter((l): l is LayoutItem => l.static === true);
 }
 
+/**
+ * Get all immovable items from the layout (static and anchor items).
+ *
+ * These items act as obstacles during dragging and compaction:
+ * - Static items cannot be dragged or resized
+ * - Anchor items can be dragged/resized but act as obstacles for other items
+ *
+ * @param layout - Layout to filter
+ * @returns Array of immovable layout items (static and anchor)
+ */
+export function getImmovables(layout: Layout): LayoutItem[] {
+  return layout.filter(
+    (l): l is LayoutItem => l.static === true || l.anchor === true
+  );
+}
+
 // ============================================================================
 // Layout Cloning
 // ============================================================================
@@ -91,6 +107,7 @@ export function cloneLayoutItem(layoutItem: LayoutItem): LayoutItem {
     maxH: layoutItem.maxH,
     moved: Boolean(layoutItem.moved),
     static: Boolean(layoutItem.static),
+    anchor: Boolean(layoutItem.anchor),
     isDraggable: layoutItem.isDraggable,
     isResizable: layoutItem.isResizable,
     resizeHandles: layoutItem.resizeHandles,
@@ -200,7 +217,7 @@ export function correctBounds(
   layout: Mutable<LayoutItem>[],
   bounds: { cols: number }
 ): LayoutItem[] {
-  const collidesWith = getStatics(layout);
+  const collidesWith = getImmovables(layout);
 
   for (let i = 0; i < layout.length; i++) {
     const l = layout[i];
@@ -323,8 +340,8 @@ export function moveElement(
     // Skip already-moved items to prevent infinite loops
     if (collision.moved) continue;
 
-    // Static items can't be moved - move the dragged item instead
-    if (collision.static) {
+    // Static and anchor items can't be moved - move the dragged item instead
+    if (collision.static || collision.anchor) {
       resultLayout = moveElementAwayFromCollision(
         resultLayout,
         collision,
@@ -372,7 +389,7 @@ export function moveElementAwayFromCollision(
 ): LayoutItem[] {
   const compactH = compactType === "horizontal";
   const compactV = compactType === "vertical";
-  const preventCollision = collidesWith.static;
+  const preventCollision = collidesWith.static || collidesWith.anchor;
 
   // Try to move up/left first (only on primary collision from user action)
   if (isUserAction) {
