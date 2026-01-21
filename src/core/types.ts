@@ -69,6 +69,14 @@ export interface LayoutItem {
   static?: boolean;
 
   /**
+   * If true, item acts as an obstacle when other items are dragged into it
+   * (like static items), but the item itself can still be dragged and resized.
+   * Other items will move around it during compaction, but the anchor item
+   * can be moved when directly manipulated.
+   */
+  anchor?: boolean;
+
+  /**
    * If false, item cannot be dragged (but may still be resizable).
    * Overrides grid-level isDraggable for this item.
    */

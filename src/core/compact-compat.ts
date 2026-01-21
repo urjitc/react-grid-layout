@@ -15,10 +15,10 @@ import { sortLayoutItems } from "./sort.js";
 // ============================================================================
 
 /**
- * Get all static items from a layout
+ * Get all immovable items (static and anchor) from a layout
  */
-function getStatics(layout: Layout): LayoutItem[] {
-  return layout.filter(l => l.static);
+function getImmovables(layout: Layout): LayoutItem[] {
+  return layout.filter(l => l.static || l.anchor);
 }
 
 const heightWidth: { x: "w"; y: "h" } = { x: "w", y: "h" };
@@ -40,15 +40,16 @@ function resolveCompactionCollision(
   const itemIndex = layout.findIndex(l => l.i === item.i);
 
   // Calculate hasStatics once if not provided
-  const layoutHasStatics = hasStatics ?? getStatics(layout).length > 0;
+  // Check for both static and anchor items (immovables)
+  const layoutHasStatics = hasStatics ?? getImmovables(layout).length > 0;
 
   // Go through each item we collide with
   for (let i = itemIndex + 1; i < layout.length; i++) {
     const otherItem = layout[i];
     if (otherItem === undefined) continue;
 
-    // Ignore static items
-    if (otherItem.static) continue;
+    // Ignore static and anchor items
+    if (otherItem.static || otherItem.anchor) continue;
 
     // Optimization: we can break early if we know we're past this element
     // We can do this because it's a sorted layout - but only if there are
@@ -162,8 +163,8 @@ export function compact(
   cols: number,
   allowOverlap?: boolean
 ): LayoutItem[] {
-  // Statics go in the compareWith array right away so items flow around them.
-  const compareWith = getStatics(layout);
+  // Statics and anchors go in the compareWith array right away so items flow around them.
+  const compareWith = getImmovables(layout);
   // We keep track of the bottom position.
   let b = bottom(compareWith);
   // We go through the items by row and column (or col and row for horizontal).
@@ -177,8 +178,8 @@ export function compact(
 
     let l = cloneLayoutItem(sortedItem);
 
-    // Don't move static elements
-    if (!l.static) {
+    // Don't move static or anchor elements
+    if (!l.static && !l.anchor) {
       l = compactItemInternal(
         compareWith,
         l,

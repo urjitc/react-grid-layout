@@ -539,7 +539,8 @@ export function GridLayout(props: GridLayoutProps): ReactElement {
         i
       };
 
-      // Move the element
+      // During drag: use forgiving collision threshold (0.5 grid units)
+      // This allows items to get closer before pushing away, giving users more precision
       const newLayout = moveElement(
         currentLayout,
         l,

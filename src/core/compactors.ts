@@ -14,7 +14,12 @@ import type {
 } from "./types.js";
 import { getFirstCollision } from "./collision.js";
 import { sortLayoutItemsByRowCol, sortLayoutItemsByColRow } from "./sort.js";
-import { bottom, cloneLayoutItem, getStatics, cloneLayout } from "./layout.js";
+import {
+  bottom,
+  cloneLayoutItem,
+  getImmovables,
+  cloneLayout
+} from "./layout.js";
 import { collides } from "./collision.js";
 
 // ============================================================================
@@ -50,12 +55,14 @@ export function resolveCompactionCollision(
   const itemIndex = layout.findIndex(l => l.i === item.i);
 
   // Calculate hasStatics once if not provided (for backwards compat)
-  const layoutHasStatics = hasStatics ?? getStatics(layout).length > 0;
+  // Check for both static and anchor items (immovables)
+  const layoutHasStatics = hasStatics ?? getImmovables(layout).length > 0;
 
   for (let i = itemIndex + 1; i < layout.length; i++) {
     const otherItem = layout[i];
     if (otherItem === undefined) continue;
-    if (otherItem.static) continue;
+    // Skip static and anchor items - they act as obstacles
+    if (otherItem.static || otherItem.anchor) continue;
     // Optimization: break early if past this element, but only if no statics
     // are present. Static items can be scattered throughout the layout,
     // so we can't assume sort order guarantees no more collisions.
@@ -180,7 +187,7 @@ export const verticalCompactor: Compactor = {
   allowOverlap: false,
 
   compact(layout: Layout, _cols: number): Layout {
-    const compareWith = getStatics(layout);
+    const compareWith = getImmovables(layout);
     let maxY = bottom(compareWith);
     const sorted = sortLayoutItemsByRowCol(layout);
     const out: LayoutItem[] = new Array(layout.length);
@@ -191,7 +198,8 @@ export const verticalCompactor: Compactor = {
 
       let l = cloneLayoutItem(sortedItem);
 
-      if (!l.static) {
+      // Only compact non-static, non-anchor items
+      if (!l.static && !l.anchor) {
         l = compactItemVertical(compareWith, l, sorted, maxY);
         maxY = Math.max(maxY, l.y + l.h);
         compareWith.push(l);
@@ -221,7 +229,7 @@ export const horizontalCompactor: Compactor = {
   allowOverlap: false,
 
   compact(layout: Layout, cols: number): Layout {
-    const compareWith = getStatics(layout);
+    const compareWith = getImmovables(layout);
     const sorted = sortLayoutItemsByColRow(layout);
     const out: LayoutItem[] = new Array(layout.length);
 
@@ -231,7 +239,8 @@ export const horizontalCompactor: Compactor = {
 
       let l = cloneLayoutItem(sortedItem);
 
-      if (!l.static) {
+      // Only compact non-static, non-anchor items
+      if (!l.static && !l.anchor) {
         l = compactItemHorizontal(compareWith, l, cols, sorted);
         compareWith.push(l);
       }
