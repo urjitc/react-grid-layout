@@ -194,6 +194,15 @@ export function compact(
       // Add to comparison array. We only collide with items before this one.
       // Statics are already in this array.
       compareWith.push(l);
+    } else if (l.anchor) {
+      // Anchor items can be dragged, so update compareWith with their new position
+      // Remove old position and add new one
+      const oldIndex = compareWith.findIndex(item => item.i === l.i);
+      if (oldIndex !== -1) {
+        compareWith.splice(oldIndex, 1);
+      }
+      compareWith.push(l);
+      b = Math.max(b, l.y + l.h);
     }
 
     // Add to output array to make sure they still come out in the right order.

@@ -1,6 +1,6 @@
 'use strict';
 
-var chunkKDV5ZWJH_js = require('./chunk-KDV5ZWJH.js');
+var chunkJEHXSS6H_js = require('./chunk-JEHXSS6H.js');
 var chunkMQJQWSQQ_js = require('./chunk-MQJQWSQQ.js');
 var react = require('react');
 var fastEquals = require('fast-equals');
@@ -71,7 +71,7 @@ function useGridLayout(options) {
     cols,
     preventCollision = false,
     onLayoutChange,
-    compactor = chunkKDV5ZWJH_js.verticalCompactor
+    compactor = chunkJEHXSS6H_js.verticalCompactor
   } = options;
   const isDraggingRef = react.useRef(false);
   const [layout, setLayoutState] = react.useState(() => {
@@ -319,23 +319,23 @@ function useResponsiveLayout(options) {
     breakpoints = DEFAULT_BREAKPOINTS,
     cols: colsConfig = DEFAULT_COLS,
     layouts: propsLayouts = {},
-    compactor = chunkKDV5ZWJH_js.verticalCompactor,
+    compactor = chunkJEHXSS6H_js.verticalCompactor,
     onBreakpointChange,
     onLayoutChange,
     onWidthChange
   } = options;
   const sortedBreakpoints = react.useMemo(
-    () => chunkKDV5ZWJH_js.sortBreakpoints(breakpoints),
+    () => chunkJEHXSS6H_js.sortBreakpoints(breakpoints),
     [breakpoints]
   );
   const initialBreakpoint = react.useMemo(
-    () => chunkKDV5ZWJH_js.getBreakpointFromWidth(breakpoints, width),
+    () => chunkJEHXSS6H_js.getBreakpointFromWidth(breakpoints, width),
     // Only calculate on mount, not on width changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
   const initialCols = react.useMemo(
-    () => chunkKDV5ZWJH_js.getColsFromBreakpoint(initialBreakpoint, colsConfig),
+    () => chunkJEHXSS6H_js.getColsFromBreakpoint(initialBreakpoint, colsConfig),
     [initialBreakpoint, colsConfig]
   );
   const [breakpoint, setBreakpoint] = react.useState(initialBreakpoint);
@@ -355,7 +355,7 @@ function useResponsiveLayout(options) {
   const prevPropsLayoutsRef = react.useRef(propsLayouts);
   const prevLayoutsRef = react.useRef(layouts);
   const layout = react.useMemo(() => {
-    return chunkKDV5ZWJH_js.findOrGenerateResponsiveLayout(
+    return chunkJEHXSS6H_js.findOrGenerateResponsiveLayout(
       layouts,
       breakpoints,
       breakpoint,
@@ -383,11 +383,11 @@ function useResponsiveLayout(options) {
   react.useEffect(() => {
     if (prevWidthRef.current === width) return;
     prevWidthRef.current = width;
-    const newBreakpoint = chunkKDV5ZWJH_js.getBreakpointFromWidth(breakpoints, width);
-    const newCols = chunkKDV5ZWJH_js.getColsFromBreakpoint(newBreakpoint, colsConfig);
+    const newBreakpoint = chunkJEHXSS6H_js.getBreakpointFromWidth(breakpoints, width);
+    const newCols = chunkJEHXSS6H_js.getColsFromBreakpoint(newBreakpoint, colsConfig);
     onWidthChange?.(width, [10, 10], newCols, null);
     if (newBreakpoint !== breakpoint) {
-      const newLayout = chunkKDV5ZWJH_js.findOrGenerateResponsiveLayout(
+      const newLayout = chunkJEHXSS6H_js.findOrGenerateResponsiveLayout(
         layouts,
         breakpoints,
         newBreakpoint,

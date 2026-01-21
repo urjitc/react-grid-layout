@@ -203,6 +203,15 @@ export const verticalCompactor: Compactor = {
         l = compactItemVertical(compareWith, l, sorted, maxY);
         maxY = Math.max(maxY, l.y + l.h);
         compareWith.push(l);
+      } else if (l.anchor) {
+        // Anchor items can be dragged, so update compareWith with their new position
+        // Remove old position and add new one
+        const oldIndex = compareWith.findIndex(item => item.i === l.i);
+        if (oldIndex !== -1) {
+          compareWith.splice(oldIndex, 1);
+        }
+        compareWith.push(l);
+        maxY = Math.max(maxY, l.y + l.h);
       }
 
       const originalIndex = layout.indexOf(sortedItem);
@@ -242,6 +251,14 @@ export const horizontalCompactor: Compactor = {
       // Only compact non-static, non-anchor items
       if (!l.static && !l.anchor) {
         l = compactItemHorizontal(compareWith, l, cols, sorted);
+        compareWith.push(l);
+      } else if (l.anchor) {
+        // Anchor items can be dragged, so update compareWith with their new position
+        // Remove old position and add new one
+        const oldIndex = compareWith.findIndex(item => item.i === l.i);
+        if (oldIndex !== -1) {
+          compareWith.splice(oldIndex, 1);
+        }
         compareWith.push(l);
       }
 

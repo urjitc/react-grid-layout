@@ -1,4 +1,6 @@
-import { getImmovables, collides, getFirstCollision, bottom, sortLayoutItemsByRowCol, cloneLayoutItem, sortLayoutItemsByColRow, cloneLayout, correctBounds } from './chunk-HT7YQ756.mjs';
+'use strict';
+
+var chunkMQJQWSQQ_js = require('./chunk-MQJQWSQQ.js');
 
 // src/core/constraints.ts
 function clamp(value, min, max) {
@@ -349,13 +351,13 @@ function resolveCompactionCollision(layout, item, moveToCoord, axis, hasStatics)
   const sizeProp = axis === "x" ? "w" : "h";
   item[axis] += 1;
   const itemIndex = layout.findIndex((l) => l.i === item.i);
-  const layoutHasStatics = hasStatics ?? getImmovables(layout).length > 0;
+  const layoutHasStatics = hasStatics ?? chunkMQJQWSQQ_js.getImmovables(layout).length > 0;
   for (let i = itemIndex + 1; i < layout.length; i++) {
     const otherItem = layout[i];
     if (otherItem === void 0) continue;
     if (otherItem.static || otherItem.anchor) continue;
     if (!layoutHasStatics && otherItem.y > item.y + item.h) break;
-    if (collides(item, otherItem)) {
+    if (chunkMQJQWSQQ_js.collides(item, otherItem)) {
       resolveCompactionCollision(
         layout,
         otherItem,
@@ -371,11 +373,11 @@ function compactItemVertical(compareWith, l, fullLayout, maxY) {
   l.x = Math.max(l.x, 0);
   l.y = Math.max(l.y, 0);
   l.y = Math.min(maxY, l.y);
-  while (l.y > 0 && !getFirstCollision(compareWith, l)) {
+  while (l.y > 0 && !chunkMQJQWSQQ_js.getFirstCollision(compareWith, l)) {
     l.y--;
   }
   let collision;
-  while ((collision = getFirstCollision(compareWith, l)) !== void 0) {
+  while ((collision = chunkMQJQWSQQ_js.getFirstCollision(compareWith, l)) !== void 0) {
     resolveCompactionCollision(fullLayout, l, collision.y + collision.h, "y");
   }
   l.y = Math.max(l.y, 0);
@@ -384,16 +386,16 @@ function compactItemVertical(compareWith, l, fullLayout, maxY) {
 function compactItemHorizontal(compareWith, l, cols, fullLayout) {
   l.x = Math.max(l.x, 0);
   l.y = Math.max(l.y, 0);
-  while (l.x > 0 && !getFirstCollision(compareWith, l)) {
+  while (l.x > 0 && !chunkMQJQWSQQ_js.getFirstCollision(compareWith, l)) {
     l.x--;
   }
   let collision;
-  while ((collision = getFirstCollision(compareWith, l)) !== void 0) {
+  while ((collision = chunkMQJQWSQQ_js.getFirstCollision(compareWith, l)) !== void 0) {
     resolveCompactionCollision(fullLayout, l, collision.x + collision.w, "x");
     if (l.x + l.w > cols) {
       l.x = cols - l.w;
       l.y++;
-      while (l.x > 0 && !getFirstCollision(compareWith, l)) {
+      while (l.x > 0 && !chunkMQJQWSQQ_js.getFirstCollision(compareWith, l)) {
         l.x--;
       }
     }
@@ -405,18 +407,25 @@ var verticalCompactor = {
   type: "vertical",
   allowOverlap: false,
   compact(layout, _cols) {
-    const compareWith = getImmovables(layout);
-    let maxY = bottom(compareWith);
-    const sorted = sortLayoutItemsByRowCol(layout);
+    const compareWith = chunkMQJQWSQQ_js.getImmovables(layout);
+    let maxY = chunkMQJQWSQQ_js.bottom(compareWith);
+    const sorted = chunkMQJQWSQQ_js.sortLayoutItemsByRowCol(layout);
     const out = new Array(layout.length);
     for (let i = 0; i < sorted.length; i++) {
       const sortedItem = sorted[i];
       if (sortedItem === void 0) continue;
-      let l = cloneLayoutItem(sortedItem);
+      let l = chunkMQJQWSQQ_js.cloneLayoutItem(sortedItem);
       if (!l.static && !l.anchor) {
         l = compactItemVertical(compareWith, l, sorted, maxY);
         maxY = Math.max(maxY, l.y + l.h);
         compareWith.push(l);
+      } else if (l.anchor) {
+        const oldIndex = compareWith.findIndex((item) => item.i === l.i);
+        if (oldIndex >= 0) {
+          compareWith.splice(oldIndex, 1);
+        }
+        compareWith.push(l);
+        maxY = Math.max(maxY, l.y + l.h);
       }
       const originalIndex = layout.indexOf(sortedItem);
       out[originalIndex] = l;
@@ -429,15 +438,21 @@ var horizontalCompactor = {
   type: "horizontal",
   allowOverlap: false,
   compact(layout, cols) {
-    const compareWith = getImmovables(layout);
-    const sorted = sortLayoutItemsByColRow(layout);
+    const compareWith = chunkMQJQWSQQ_js.getImmovables(layout);
+    const sorted = chunkMQJQWSQQ_js.sortLayoutItemsByColRow(layout);
     const out = new Array(layout.length);
     for (let i = 0; i < sorted.length; i++) {
       const sortedItem = sorted[i];
       if (sortedItem === void 0) continue;
-      let l = cloneLayoutItem(sortedItem);
+      let l = chunkMQJQWSQQ_js.cloneLayoutItem(sortedItem);
       if (!l.static && !l.anchor) {
         l = compactItemHorizontal(compareWith, l, cols, sorted);
+        compareWith.push(l);
+      } else if (l.anchor) {
+        const oldIndex = compareWith.findIndex((item) => item.i === l.i);
+        if (oldIndex >= 0) {
+          compareWith.splice(oldIndex, 1);
+        }
         compareWith.push(l);
       }
       const originalIndex = layout.indexOf(sortedItem);
@@ -451,21 +466,21 @@ var noCompactor = {
   type: null,
   allowOverlap: false,
   compact(layout, _cols) {
-    return cloneLayout(layout);
+    return chunkMQJQWSQQ_js.cloneLayout(layout);
   }
 };
 var verticalOverlapCompactor = {
   ...verticalCompactor,
   allowOverlap: true,
   compact(layout, _cols) {
-    return cloneLayout(layout);
+    return chunkMQJQWSQQ_js.cloneLayout(layout);
   }
 };
 var horizontalOverlapCompactor = {
   ...horizontalCompactor,
   allowOverlap: true,
   compact(layout, _cols) {
-    return cloneLayout(layout);
+    return chunkMQJQWSQQ_js.cloneLayout(layout);
   }
 };
 var noOverlapCompactor = {
@@ -523,7 +538,7 @@ function getColsFromBreakpoint(breakpoint, cols) {
 function findOrGenerateResponsiveLayout(layouts, breakpoints, breakpoint, lastBreakpoint, cols, compactTypeOrCompactor) {
   const existingLayout = layouts[breakpoint];
   if (existingLayout) {
-    return cloneLayout(existingLayout);
+    return chunkMQJQWSQQ_js.cloneLayout(existingLayout);
   }
   let layout = layouts[lastBreakpoint];
   const breakpointsSorted = sortBreakpoints(breakpoints);
@@ -539,8 +554,8 @@ function findOrGenerateResponsiveLayout(layouts, breakpoints, breakpoint, lastBr
       break;
     }
   }
-  const clonedLayout = cloneLayout(layout || []);
-  const corrected = correctBounds(clonedLayout, { cols });
+  const clonedLayout = chunkMQJQWSQQ_js.cloneLayout(layout || []);
+  const corrected = chunkMQJQWSQQ_js.correctBounds(clonedLayout, { cols });
   const compactor = typeof compactTypeOrCompactor === "object" && compactTypeOrCompactor !== null ? compactTypeOrCompactor : getCompactor(compactTypeOrCompactor);
   return compactor.compact(corrected, cols);
 }
@@ -563,4 +578,42 @@ function getIndentationValue(value, breakpoint) {
   return [10, 10];
 }
 
-export { absoluteStrategy, applyPositionConstraints, applySizeConstraints, aspectRatio, boundedX, boundedY, compactItemHorizontal, compactItemVertical, containerBounds, createScaledStrategy, defaultConstraints, defaultDragConfig, defaultDropConfig, defaultGridConfig, defaultPositionStrategy, defaultResizeConfig, findOrGenerateResponsiveLayout, getBreakpointFromWidth, getColsFromBreakpoint, getCompactor, getIndentationValue, gridBounds, horizontalCompactor, horizontalOverlapCompactor, maxSize, minMaxSize, minSize, noCompactor, noOverlapCompactor, perc, resizeItemInDirection, resolveCompactionCollision, setTopLeft, setTransform, snapToGrid, sortBreakpoints, transformStrategy, verticalCompactor, verticalOverlapCompactor };
+exports.absoluteStrategy = absoluteStrategy;
+exports.applyPositionConstraints = applyPositionConstraints;
+exports.applySizeConstraints = applySizeConstraints;
+exports.aspectRatio = aspectRatio;
+exports.boundedX = boundedX;
+exports.boundedY = boundedY;
+exports.compactItemHorizontal = compactItemHorizontal;
+exports.compactItemVertical = compactItemVertical;
+exports.containerBounds = containerBounds;
+exports.createScaledStrategy = createScaledStrategy;
+exports.defaultConstraints = defaultConstraints;
+exports.defaultDragConfig = defaultDragConfig;
+exports.defaultDropConfig = defaultDropConfig;
+exports.defaultGridConfig = defaultGridConfig;
+exports.defaultPositionStrategy = defaultPositionStrategy;
+exports.defaultResizeConfig = defaultResizeConfig;
+exports.findOrGenerateResponsiveLayout = findOrGenerateResponsiveLayout;
+exports.getBreakpointFromWidth = getBreakpointFromWidth;
+exports.getColsFromBreakpoint = getColsFromBreakpoint;
+exports.getCompactor = getCompactor;
+exports.getIndentationValue = getIndentationValue;
+exports.gridBounds = gridBounds;
+exports.horizontalCompactor = horizontalCompactor;
+exports.horizontalOverlapCompactor = horizontalOverlapCompactor;
+exports.maxSize = maxSize;
+exports.minMaxSize = minMaxSize;
+exports.minSize = minSize;
+exports.noCompactor = noCompactor;
+exports.noOverlapCompactor = noOverlapCompactor;
+exports.perc = perc;
+exports.resizeItemInDirection = resizeItemInDirection;
+exports.resolveCompactionCollision = resolveCompactionCollision;
+exports.setTopLeft = setTopLeft;
+exports.setTransform = setTransform;
+exports.snapToGrid = snapToGrid;
+exports.sortBreakpoints = sortBreakpoints;
+exports.transformStrategy = transformStrategy;
+exports.verticalCompactor = verticalCompactor;
+exports.verticalOverlapCompactor = verticalOverlapCompactor;
